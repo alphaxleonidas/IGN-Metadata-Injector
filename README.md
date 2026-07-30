@@ -20,6 +20,8 @@ Adds game data from IGN and HowLongToBeat on a Steam or Epic game page
  - Works on all browsers
  - Userscript available for easy install and updates
  - can be integrated on Steam app for desktop
+
+  Note: The `storage` permission is needed to store extension settings.
   
 # Installation
 
