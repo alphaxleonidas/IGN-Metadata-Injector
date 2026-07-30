@@ -56,6 +56,6 @@ Adds game data from IGN and HowLongToBeat on a Steam or Epic game page
 
 -  Select the firefox zip
 
-  The extension should work.
+-  The extension should work.
   
   
