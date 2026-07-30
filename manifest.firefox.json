@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "IGN Metadata Injector",
+  "version": "1.0.0",
+  "description": "Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors, directly on Steam and Epic Games store pages.",
+  "author": "Leonidas",
+
+  "permissions": [
+    "storage"
+  ],
+
+  "host_permissions": [
+    "https://*.steampowered.com/*",
+    "https://*.epicgames.com/*",
+    "https://www.ign.com/*",
+    "https://ign.com/*",
+    "https://mollusk.apis.ign.com/*",
+    "https://howlongtobeat.com/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.steampowered.com/*",
+        "https://*.epicgames.com/*"
+      ],
+      "run_at": "document_idle",
+      "js": [
+        "src/00-namespace.js",
+        "src/01-config-store.js",
+        "src/02-labels.js",
+        "src/03-title-resolver.js",
+        "src/04-page-scraper.js",
+        "src/05-badge-render.js",
+        "src/06-settings-panel.js",
+        "src/07-ign-api.js",
+        "src/08-hltb-api.js",
+        "src/09-fetch-orchestrator.js",
+        "src/10-main.js"
+      ]
+    }
+  ],
+
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ign-metadata-injector@example.com",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}
