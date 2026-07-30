@@ -1,6 +1,9 @@
 # IGN-Metadata-Injector
 Adds game data from IGN and HowLongToBeat on a Steam or Epic game page
 
+<img width="1368" height="891" alt="image" src="https://github.com/user-attachments/assets/05f19331-8cdb-4586-bbd4-89862f208961" />
+
+
 ## Features
  - IGN Rating and User Score
  - Developer name
@@ -32,7 +35,7 @@ Adds game data from IGN and HowLongToBeat on a Steam or Epic game page
 
 -  Extract the file.
 
--  Go to chrome://extensions
+-  Go to `chrome://extensions`
 
 -  Enable `Developer Mode` on the top right.
 
