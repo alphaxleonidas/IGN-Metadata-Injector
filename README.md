@@ -24,7 +24,7 @@ Adds game data from IGN and HowLongToBeat on a Steam or Epic game page
 
 # Userscript: 
 
-  *Requires Tampermonkey extension or any Userscript Manager* **[Install](https://raw.githubusercontent.com/alphaxleonidas/IGN-Metadata-Injector/main/ign-metadata-injector.user.js)**
+  *Requires Tampermonkey extension or any Userscript Manager* :  **[Install](https://raw.githubusercontent.com/alphaxleonidas/IGN-Metadata-Injector/main/ign-metadata-injector.user.js)**
 
 # Chrome/Steam
 
