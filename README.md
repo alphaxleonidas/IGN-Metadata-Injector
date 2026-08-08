@@ -9,6 +9,7 @@ Injects IGN data inside Steam and Epic's game page.
 - Developer name
 - HowLongToBeat time
 - HLTB Leisure Time
+- Steam reviews (extracted from the page)
 - Curated selection of location options
 - Source overrides for unavailable games
 - Choose which item you want in your main page
