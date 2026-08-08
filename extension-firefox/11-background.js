@@ -8,3 +8,17 @@
 chrome.action.onClicked.addListener(() => {
     chrome.runtime.openOptionsPage();
 });
+
+// Performs cross-origin fetches on behalf of the content script / options page (see
+// 00-namespace.js's NS.http). Running the request here — an extension page, not
+// attached to any tab — means it's never subject to a website's own CSP the way a
+// content script's own fetch()/XHR can be, and it behaves identically regardless of
+// which site (Steam vs Epic) asked for it. Also registered at the top level, same
+// MV3-service-worker requirement as above.
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (!message || message.type !== "ignFetch" || typeof message.url !== "string") return false;
+    fetch(message.url, { method: "GET", credentials: "omit" })
+        .then(res => res.text().then(text => sendResponse({ ok: true, status: res.status, responseText: text })))
+        .catch(() => sendResponse({ ok: false }));
+    return true; // keep the message channel open for the async sendResponse above
+});

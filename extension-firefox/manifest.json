@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IGN Metadata Injector",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors, directly on Steam and Epic Games store pages.",
   "author": "Leonidas",
 
@@ -12,10 +12,10 @@
   "host_permissions": [
     "https://*.steampowered.com/*",
     "https://*.epicgames.com/*",
-    "https://www.ign.com/*",
     "https://ign.com/*",
-    "https://mollusk.apis.ign.com/*",
-    "https://howlongtobeat.com/*"
+    "https://*.ign.com/*",
+    "https://howlongtobeat.com/*",
+    "https://*.howlongtobeat.com/*"
   ],
 
   "content_scripts": [
