@@ -22,7 +22,7 @@ Injects IGN data inside Steam and Epic's game page.
 </p>
 
 
-<<!--
+<!--
 <img width="1241" height="897" alt="Screenshot from 2026-08-08 16-23-06" src="https://github.com/user-attachments/assets/8967d059-8a40-47bd-8053-ac3764a723ce" />
 <img width="1401" height="888" alt="Screenshot from 2026-08-08 16-23-26" src="https://github.com/user-attachments/assets/a06a1d09-3976-4c17-a5b6-292e84059506" />
 -->
