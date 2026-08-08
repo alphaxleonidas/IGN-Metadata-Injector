@@ -32,7 +32,7 @@ Injects IGN data inside Steam and Epic's game page.
  ## One Click Userscript: [Install](https://github.com/alphaxleonidas/IGN-Metadata-Injector/raw/refs/heads/main/userscript/ign-metadata-injector.user.js)
 
  
-   Requirements: Tampermonkey or some userscript manager
+   **Requirements:** Tampermonkey or some userscript manager
 
 # Chrome/Chromium 
 
