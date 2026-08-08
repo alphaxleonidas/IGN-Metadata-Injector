@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IGN Metadata Injector — Settings</title>
+<link rel="stylesheet" href="11-options.css">
+</head>
+<body>
+    <div id="app">
+        <h1>IGN Metadata Injector</h1>
+        <p class="sub">Settings apply immediately on save — no need to reload Steam/Epic tabs that are already open (they'll pick it up on next page change).</p>
+
+        <div class="columns">
+            <section>
+                <h2>Visible Sections</h2>
+                <div id="toggle_list"></div>
+                <h2 style="margin-top:20px;">Enable / Disable Per Site</h2>
+                <div id="enable_list"></div>
+            </section>
+            <section>
+                <h2>Section Order (drag to reorder)</h2>
+                <p class="sub">HowLongToBeat / HLTB Leisure Time order only applies when their Location below is set to "Inline".</p>
+                <ul id="order_list"></ul>
+            </section>
+        </div>
+
+        <section class="full">
+            <label class="toggle_row" style="border-bottom:none;">
+                <span>Share the same placement for Steam and Epic</span>
+                <span class="switch">
+                    <input type="checkbox" id="placement_shared">
+                    <span class="switch_slider"></span>
+                </span>
+            </label>
+        </section>
+
+        <section class="full">
+            <h2>Overlay Position</h2>
+            <div class="locations_row" id="position_selects"></div>
+        </section>
+
+        <section class="full locations_row">
+            <div>
+                <h2>HowLongToBeat Location</h2>
+                <div class="locations_row" id="hltb_location_selects"></div>
+            </div>
+            <div>
+                <h2>HLTB Leisure Time Location</h2>
+                <div class="locations_row" id="leisure_location_selects"></div>
+            </div>
+        </section>
+
+        <section class="full">
+            <h2>Per-Title Overrides</h2>
+            <p class="sub">
+                For games that won't auto-resolve: force an exact IGN page and/or an exact
+                HowLongToBeat page for one title. Matched by exact title (case-insensitive).
+                Added/removed immediately — no need to hit Save below.
+            </p>
+            <ul id="override_list"></ul>
+            <p id="override_empty" class="empty" hidden>No overrides added yet.</p>
+            <div class="override_form">
+                <input type="text" id="override_title" placeholder="Game title, exactly as shown on the store page">
+                <input type="text" id="override_ign_url" placeholder="IGN URL (optional) — e.g. https://www.ign.com/games/some-slug">
+                <input type="text" id="override_hltb_url" placeholder="HowLongToBeat URL (optional) — e.g. https://howlongtobeat.com/game/1234">
+                <button id="override_add">Add / Update</button>
+            </div>
+        </section>
+
+        <div class="actions">
+            <span id="save_status"></span>
+            <button id="save">Save</button>
+        </div>
+    </div>
+    <script src="11-options.js"></script>
+</body>
+</html>
