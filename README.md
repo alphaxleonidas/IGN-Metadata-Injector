@@ -68,3 +68,15 @@ So, the idea is to make Steam app open the main chromium browser from which we c
 - Now the add-on should run.
 
 Note: If the firefox does not recognize the .zip file type, you can rename the .zip to .xpi and it should work fine. .xpi is bacially a zip file with a changed file extension name.
+
+
+# Build Instructions:
+[For the userscript]
+
+- Install `node.js`.
+- Open the terminal and `cd` into project's root directory.
+- Run
+  ```
+  node build.js
+  ```
+- It will create a file in `PROJECTROOTFOLDER/userscript` named as `ign-metadata-injector.user.js`.
