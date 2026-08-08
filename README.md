@@ -74,8 +74,12 @@ Note: If the firefox does not recognize the .zip file type, you can rename the .
 [For the userscript]
 
 - Install `node.js`.
-- Open the terminal and `cd` into project's root directory.
-- Run
+- Clone the repo and `cd` into project's root directory 
+```
+git clone https://www.github.com/alphaxleonidas/ign-metadata-injector.git
+cd IGN-Metadata-Injector
+```
+- Run the build command :
   ```
   node build.js
   ```
