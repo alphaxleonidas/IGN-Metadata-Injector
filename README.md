@@ -15,16 +15,10 @@ Injects IGN data inside Steam and Epic's game page.
 - Supports both Steam and Epic stores
 - Allows you to select individual preferences for each store.
   
-<img src="https://github.com/user-attachments/assets/8967d059-8a40-47bd-8053-ac3764a723ce"
-     alt="Epic version"
-     width="620"
-     height="444"
-     style="object-fit: cover;" /><img
-     src="https://github.com/user-attachments/assets/a06a1d09-3976-4c17-a5b6-292e84059506"
-     alt="Steam version"
-     width="620"
-     height="444"
-     style="object-fit: cover;" />
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/8967d059-8a40-47bd-8053-ac3764a723ce" alt="Epic version" width="49%" height="300" style="object-fit: cover;" />
+  <img src="https://github.com/user-attachments/assets/a06a1d09-3976-4c17-a5b6-292e84059506" alt="Steam version" width="49%" height="300" style="object-fit: cover;" />
+</p>
 
 
 <<!--
