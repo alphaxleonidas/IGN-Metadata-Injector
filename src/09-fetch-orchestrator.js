@@ -1,11 +1,12 @@
 (function (NS) {
     "use strict";
     function attachLeisureSection(resolvedHltbUrl) {
-        if (!resolvedHltbUrl || !NS.getConfig("showLeisure")) return;
+        const leisureLoc = NS.getSectionLocation("leisure");
+        if (!resolvedHltbUrl || !NS.getConfig("showLeisure")) { NS.finalizeHltbStandalone(); return; }
         NS.fetchHltbLeisure(resolvedHltbUrl, leisureData => {
-            const html = NS.buildLeisureRow(leisureData, resolvedHltbUrl), loc = NS.getSectionLocation("leisure");
-            if (loc === "inline") NS.fillLeisurePlaceholder(html);
-            else NS.renderStandalone("ign_leisure_standalone", html, loc);
+            const html = NS.buildLeisureRow(leisureData, resolvedHltbUrl);
+            if (leisureLoc === "inline") { NS.fillLeisurePlaceholder(html); NS.clearLeisureStandalones(); }
+            else NS.placeLeisureAndFinalize(html, leisureLoc);
         });
     }
     function fetchBundleData(bundle, gameTitle) {

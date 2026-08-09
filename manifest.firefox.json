@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IGN Metadata Injector",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors, directly on Steam and Epic Games store pages.",
   "author": "Leonidas",
 

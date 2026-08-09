@@ -73,7 +73,7 @@
             if (pref === "aboveTitle") { const titleArea = document.querySelector(".page_title_area.game_title_area") || document.querySelector(".page_title_area"); if (titleArea) return { element: NS.findSafeBeforeTarget(titleArea), position: "before" }; }
             if (pref === "sidebarBottom" || pref === "belowRightSidebarMetadata" || pref === "aboveRightSidebarMetadata") { const sidebar = document.querySelector(".rightcol.game_meta_data") || document.querySelector(".game_meta_data"); if (sidebar) return { element: sidebar, position: pref === "aboveRightSidebarMetadata" ? "prepend" : "append" }; }
             if (pref === "abovePrice") { const purchaseArea = document.querySelector("#game_area_purchase"); if (purchaseArea) return { element: purchaseArea, position: "before" }; }
-            if (pref === "belowGameMedia") { const media = document.querySelector(".highlight_ctn"); if (media) return { element: media, position: "after" }; }
+            if (pref === "belowGameMedia") { const media = document.querySelector(".highlight_ctn"); if (media) return { element: media, position: "after", alignTo: media }; }
             if (pref === "belowLeftSidebar") {
                 // Anchored on "System Requirements" (.sys_req + its fade/read-more overlay share one
                 // .game_page_autocollapse_ctn wrapper) — stays inside .leftcol's normal flow, so no

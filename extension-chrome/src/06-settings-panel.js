@@ -8,6 +8,7 @@
             .ign_settings_toggle_row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 12px; color: #c6d4df; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer; } .ign_switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; margin-left: 10px; } .ign_switch input { opacity: 0; width: 0; height: 0; }
             .ign_switch_slider { position: absolute; inset: 0; background: rgba(255,255,255,0.15); border-radius: 20px; transition: 0.2s; } .ign_switch_slider::before { content: ""; position: absolute; height: 14px; width: 14px; left: 3px; top: 3px; background: #ffffff; border-radius: 50%; transition: 0.2s; } .ign_switch input:checked + .ign_switch_slider { background: #66c0f4; } .ign_switch input:checked + .ign_switch_slider::before { transform: translateX(16px); }
             #ign_order_list { list-style: none; margin: 0; padding: 0; } .ign_order_item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 12px; color: #c6d4df; cursor: grab; } .ign_order_item.ign_drag_over { border: 1px dashed #66c0f4; } .ign_order_handle { color: #8f98a0; font-size: 14px; } .ign_settings_actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+            .ign_hltb_leisure_order_block { margin-top: 14px; padding-top: 14px; border-top: 1px dashed rgba(255,255,255,0.12); } .ign_hltb_leisure_order_block ul { list-style: none; margin: 0; padding: 0; }
             .ign_settings_actions button { border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; } #ign_settings_save { background: #ff3e3e; color: #ffffff; } #ign_settings_cancel { background: rgba(255,255,255,0.1); color: #c6d4df; }
             .ign_settings_select { width: 100%; background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; } .ign_settings_columns > div, .ign_locations_row > div { flex: 1; min-width: 200px; } .ign_locations_row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 18px; } #ign_override_list { list-style: none; margin: 0 0 10px; padding: 0; max-height: 160px; overflow-y: auto; }
             .ign_override_item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 12px; color: #c6d4df; } .ign_override_item_main { display: flex; align-items: center; gap: 8px; overflow: hidden; } .ign_override_item_main strong { font-size: 12px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -15,6 +16,30 @@
             .ign_override_empty { font-size: 11px; color: #8f98a0; margin: 0 0 10px; } .ign_override_form { display: flex; flex-direction: column; gap: 6px; } .ign_override_form input { background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; }
             .ign_override_form button { align-self: flex-end; border: none; border-radius: 6px; padding: 7px 14px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; background: rgba(102,192,244,0.15); color: #66c0f4; }
         </style>`;
+    const HLTB_LEISURE_ORDER_LABELS = { hltb: "HowLongToBeat", leisure: "HLTB Leisure Time" };
+    function hltbLeisureOrderRows(order) {
+        return order.map(key => `<li class="ign_order_item" draggable="true" data-key="${key}"><span class="ign_order_handle">⠿</span><span>${HLTB_LEISURE_ORDER_LABELS[key]}</span></li>`).join("");
+    }
+    // Only relevant when HLTB and Leisure Time are placed at the exact same non-inline location —
+    // otherwise they render as independent elements with no shared order to pick.
+    function hltbLeisureOrderNeeded(hltbLoc, leisureLoc) { return hltbLoc !== "inline" && hltbLoc === leisureLoc; }
+    function hltbLeisureOrderBlockHtml(platform, label, order) {
+        return `<div class="ign_hltb_leisure_order_block" data-platform="${platform}"><label style="display:block;font-size:10px;color:#a1b0bd;text-transform:uppercase;font-weight:bold;margin-bottom:5px;">${label}: HLTB / Leisure Order (both share one location)</label><ul>${hltbLeisureOrderRows(order)}</ul></div>`;
+    }
+    function wireDragReorder(listEl) {
+        let draggedItem = null;
+        listEl.querySelectorAll(".ign_order_item").forEach(item => {
+            item.addEventListener("dragstart", () => { draggedItem = item; item.style.opacity = "0.4"; });
+            item.addEventListener("dragend", () => { item.style.opacity = "1"; item.classList.remove("ign_drag_over"); });
+            item.addEventListener("dragover", e => {
+                e.preventDefault();
+                if (!draggedItem || draggedItem === item) return;
+                const bounds = item.getBoundingClientRect();
+                const isAfter = e.clientY - bounds.top > bounds.height / 2;
+                item.parentNode.insertBefore(draggedItem, isAfter ? item.nextSibling : item);
+            });
+        });
+    }
     function buildSettingsPanelHtml() {
         const toggleRows = Object.keys(NS.CONFIG_KEYS).map(key =>
             `<label class="ign_settings_toggle_row"><span>${NS.escapeHtml(NS.CONFIG_KEYS[key])}</span><span class="ign_switch"><input type="checkbox" data-toggle-key="${key}" ${NS.getConfig(key) ? "checked" : ""}><span class="ign_switch_slider"></span></span></label>`).join("");
@@ -52,7 +77,7 @@
                         <div><h3>Visible Sections</h3>${toggleRows}<h3 style="margin-top:14px;">Enable / Disable Per Site</h3>${enableRows}</div>
                         <div>
                             <h3>Section Order (drag to reorder)</h3>
-                            <p class="ign_settings_sub">HowLongToBeat / HLTB Leisure Time order only applies when their Location below is set to "Inline".</p>
+                            <p class="ign_settings_sub">HowLongToBeat / HLTB Leisure Time order only applies when their Location below is set to "Inline" — when they share the same non-inline Location instead, a separate order picker appears below.</p>
                             <ul id="ign_order_list">${orderRows}</ul>
                         </div>
                     </div>
@@ -65,7 +90,8 @@
                     ${placementPlatforms.length === 0 ? '<p class="ign_settings_sub">Enable at least one site above to configure placement.</p>' : `
                     <div style="margin-top:10px;"><h3>Overlay Position</h3><div class="ign_locations_row">${placementPlatforms.map(positionSelect).join("")}</div></div>
                     <div class="ign_locations_row">${placementPlatforms.map(p => locationSelect("hltb", "HowLongToBeat Location", p)).join("")}</div>
-                    <div class="ign_locations_row">${placementPlatforms.map(p => locationSelect("leisure", "HLTB Leisure Time Location", p)).join("")}</div>`}
+                    <div class="ign_locations_row">${placementPlatforms.map(p => locationSelect("leisure", "HLTB Leisure Time Location", p)).join("")}</div>
+                    <div id="ign_hltb_leisure_order_wrap">${placementPlatforms.map(p => hltbLeisureOrderNeeded(NS.getSectionLocationFor("hltb", p), NS.getSectionLocationFor("leisure", p)) ? hltbLeisureOrderBlockHtml(p, platformLabel(p), NS.getHltbLeisureOrderFor(p)) : "").join("")}</div>`}
                     <div style="margin-top:18px;">
                         <h3>Per-Title Overrides</h3>
                         <p class="ign_settings_sub" style="margin-bottom:8px;">For games that won't auto-resolve: force an exact IGN page and/or an exact HowLongToBeat page for one title. Matched by exact title (case-insensitive). Added/removed immediately — no need to hit Save below.</p>
@@ -91,18 +117,31 @@
         document.body.insertAdjacentHTML("beforeend", buildSettingsPanelHtml());
         const overlay = document.getElementById("ign_settings_overlay");
         const list = document.getElementById("ign_order_list");
-        let draggedItem = null;
-        list.querySelectorAll(".ign_order_item").forEach(item => {
-            item.addEventListener("dragstart", () => { draggedItem = item; item.style.opacity = "0.4"; });
-            item.addEventListener("dragend", () => { item.style.opacity = "1"; item.classList.remove("ign_drag_over"); });
-            item.addEventListener("dragover", e => {
-                e.preventDefault();
-                if (!draggedItem || draggedItem === item) return;
-                const bounds = item.getBoundingClientRect();
-                const isAfter = e.clientY - bounds.top > bounds.height / 2;
-                item.parentNode.insertBefore(draggedItem, isAfter ? item.nextSibling : item);
+        wireDragReorder(list);
+        overlay.querySelectorAll(".ign_hltb_leisure_order_block ul").forEach(wireDragReorder);
+        // Adds/removes each platform's HLTB/Leisure order picker as the two Location <select>s are
+        // changed — reading their live (unsaved) values, not storage — without disturbing a block
+        // that's already present and still relevant (so an in-progress drag isn't reset every time
+        // an unrelated select fires a change event).
+        function syncHltbLeisureOrderWrap() {
+            const wrap = overlay.querySelector("#ign_hltb_leisure_order_wrap");
+            if (!wrap) return;
+            const shared = NS.getPlacementShared();
+            NS.getVisiblePlatforms().forEach(platform => {
+                const hltbSel = overlay.querySelector(`#ign_hltb_location_${platform}`);
+                const leisureSel = overlay.querySelector(`#ign_leisure_location_${platform}`);
+                const needed = hltbSel && leisureSel && hltbLeisureOrderNeeded(hltbSel.value, leisureSel.value);
+                const existing = wrap.querySelector(`.ign_hltb_leisure_order_block[data-platform="${platform}"]`);
+                if (needed && !existing) {
+                    const label = shared ? "Steam + Epic" : platform;
+                    wrap.insertAdjacentHTML("beforeend", hltbLeisureOrderBlockHtml(platform, label, NS.getHltbLeisureOrderFor(platform)));
+                    wireDragReorder(wrap.querySelector(`.ign_hltb_leisure_order_block[data-platform="${platform}"] ul`));
+                } else if (!needed && existing) {
+                    existing.remove();
+                }
             });
-        });
+        }
+        overlay.querySelectorAll('select[id^="ign_hltb_location_"], select[id^="ign_leisure_location_"]').forEach(sel => sel.addEventListener("change", syncHltbLeisureOrderWrap));
         overlay.querySelectorAll(".ign_override_remove").forEach(btn => btn.addEventListener("click", () => { NS.removeUserOverride(btn.dataset.key); refreshBadgeNow(); NS.openSettingsPanel(); }));
         overlay.querySelector("#ign_override_add").addEventListener("click", () => {
             const title = overlay.querySelector("#ign_override_title").value.trim();
@@ -129,6 +168,11 @@
                     const sel = overlay.querySelector(`#ign_${key}_location_${platform}`);
                     if (sel) targets.forEach(p => NS.setSectionLocationFor(key, p, sel.value));
                 });
+                const orderBlock = overlay.querySelector(`.ign_hltb_leisure_order_block[data-platform="${platform}"]`);
+                if (orderBlock) {
+                    const order = Array.from(orderBlock.querySelectorAll(".ign_order_item")).map(li => li.dataset.key);
+                    targets.forEach(p => NS.setHltbLeisureOrderFor(p, order));
+                }
             });
             overlay.remove();
             NS.registerMenuCommands();

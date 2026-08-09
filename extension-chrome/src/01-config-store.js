@@ -1,13 +1,13 @@
 (function(NS) {
     "use strict";
     const CONFIG_KEYS = {
-        showIgnScore: "Show IGN Score", showUserRating: "Show User Rating", showHltb: "Show HowLongToBeat",
-        showLeisure: "Show HLTB Leisure Times", showSteamReviews: "Show Steam Reviews", showDeveloper: "Show Developer",
-        showEsrb: "Show ESRB Rating & Descriptors", showAward: "Show IGN Award / Leaderboard"
+        showIgnScore: "Show IGN Score", showUserRating: "Show User Rating", showSteamReviews: "Show Steam Reviews",
+        showAward: "Show IGN Award / Leaderboard", showEsrb: "Show ESRB Rating & Descriptors", showDeveloper: "Show Developer",
+        showHltb: "Show HowLongToBeat", showLeisure: "Show HLTB Leisure Times"
     };
     const CONFIG_DEFAULTS = {
-        showIgnScore: true, showUserRating: true, showHltb: true, showLeisure: true,
-        showSteamReviews: true, showDeveloper: true, showEsrb: true, showAward: true
+        showIgnScore: true, showUserRating: true, showSteamReviews: true, showAward: true,
+        showEsrb: true, showDeveloper: true, showHltb: true, showLeisure: true
     };
     NS.CONFIG_KEYS = CONFIG_KEYS;
     NS.CONFIG_DEFAULTS = CONFIG_DEFAULTS;
@@ -61,6 +61,15 @@
     NS.setSectionLocationFor = (key, platform, value) => NS.storage.set(key + "Location" + platform, value);
     NS.getSectionLocation = key => NS.getSectionLocationFor(key, currentPlatform());
     NS.setSectionLocation = (key, value) => NS.setSectionLocationFor(key, currentPlatform(), value);
+    // Order between HLTB and HLTB Leisure Time specifically, used only when both are placed at the
+    // same non-inline location (they'd otherwise render as two independent standalone elements with
+    // no defined relative order). Values are ["hltb","leisure"] or ["leisure","hltb"].
+    NS.getHltbLeisureOrderFor = platform => {
+        const stored = NS.storage.getSync("hltbLeisureOrder" + platform, null);
+        return Array.isArray(stored) && stored.length === 2 && stored.includes("hltb") && stored.includes("leisure") ? stored : ["hltb", "leisure"];
+    };
+    NS.setHltbLeisureOrderFor = (platform, order) => NS.storage.set("hltbLeisureOrder" + platform, order);
+    NS.getHltbLeisureOrder = () => NS.getHltbLeisureOrderFor(currentPlatform());
     NS.getUserOverrides = () => NS.storage.getSync("userTitleOverrides", {});
     NS.setUserOverrides = overridesObj => NS.storage.set("userTitleOverrides", overridesObj);
     NS.setUserOverride = function setUserOverride(title, ignUrl, hltbUrl) {

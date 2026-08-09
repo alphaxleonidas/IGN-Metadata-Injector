@@ -21,7 +21,7 @@ const OUT_FILE = path.join(USERSCRIPT_DIR, "ign-metadata-injector.user.js");
 const HEADER = `// ==UserScript==
 // @name         IGN Metadata Injector
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.0.2
 // @description  Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors.
 // @author       Leonidas
 // @match        https://*.steampowered.com/*

@@ -31,8 +31,12 @@
                 <span class="order_handle">⠿</span>
                 <span>${NS.escapeHtml(NS.SECTION_LABELS[key] || key)}</span>
             </li>`).join("");
+        wireDragReorder(list);
+    }
+
+    function wireDragReorder(listEl) {
         let draggedItem = null;
-        list.querySelectorAll(".order_item").forEach(item => {
+        listEl.querySelectorAll(".order_item").forEach(item => {
             item.addEventListener("dragstart", () => { draggedItem = item; item.style.opacity = "0.4"; });
             item.addEventListener("dragend", () => { item.style.opacity = "1"; });
             item.addEventListener("dragover", e => {
@@ -43,6 +47,15 @@
                 item.parentNode.insertBefore(draggedItem, isAfter ? item.nextSibling : item);
             });
         });
+    }
+
+    const HLTB_LEISURE_ORDER_LABELS = { hltb: "HowLongToBeat", leisure: "HLTB Leisure Time" };
+    // Only relevant when HLTB and Leisure Time are placed at the exact same non-inline location —
+    // otherwise they render as independent elements with no shared order to pick.
+    function hltbLeisureOrderNeeded(hltbLoc, leisureLoc) { return hltbLoc !== "inline" && hltbLoc === leisureLoc; }
+    function hltbLeisureOrderBlockHtml(platform, label, order) {
+        const rows = order.map(key => `<li class="order_item" draggable="true" data-key="${key}"><span class="order_handle">⠿</span><span>${HLTB_LEISURE_ORDER_LABELS[key]}</span></li>`).join("");
+        return `<div class="hltb_leisure_order_block" data-platform="${platform}"><label class="platform_select_label">${label}: HLTB / Leisure Order (both share one location)</label><ul>${rows}</ul></div>`;
     }
 
     function renderEnableToggles(container) {
@@ -96,6 +109,7 @@
         const positionSelects = document.getElementById("position_selects");
         const hltbLocationSelects = document.getElementById("hltb_location_selects");
         const leisureLocationSelects = document.getElementById("leisure_location_selects");
+        const hltbLeisureOrderWrap = document.getElementById("hltb_leisure_order_wrap");
         const overrideList = document.getElementById("override_list");
         const overrideEmpty = document.getElementById("override_empty");
         const saveBtn = document.getElementById("save");
@@ -111,12 +125,51 @@
             return map;
         }
 
+        function visiblePlatforms() {
+            const shared = sharedToggle.checked;
+            const enabled = NS.PLATFORMS.filter(p => currentEnabledMap()[p]);
+            return shared ? enabled.slice(0, 1) : enabled;
+        }
+
+        // Adds/removes each platform's HLTB/Leisure order picker as the two Location <select>s are
+        // changed — reading their live (unsaved) values, not storage — without disturbing a block
+        // that's already present and still relevant (so an in-progress drag isn't reset every time
+        // an unrelated select fires a change event).
+        function syncHltbLeisureOrderWrap() {
+            const shared = sharedToggle.checked;
+            visiblePlatforms().forEach(platform => {
+                const hltbSel = document.getElementById("sel_hltbLocation" + platform);
+                const leisureSel = document.getElementById("sel_leisureLocation" + platform);
+                const needed = hltbSel && leisureSel && hltbLeisureOrderNeeded(hltbSel.value, leisureSel.value);
+                const existing = hltbLeisureOrderWrap.querySelector(`.hltb_leisure_order_block[data-platform="${platform}"]`);
+                if (needed && !existing) {
+                    const label = shared ? "Steam + Epic" : platform;
+                    hltbLeisureOrderWrap.insertAdjacentHTML("beforeend", hltbLeisureOrderBlockHtml(platform, label, NS.getHltbLeisureOrderFor(platform)));
+                    wireDragReorder(hltbLeisureOrderWrap.querySelector(`.hltb_leisure_order_block[data-platform="${platform}"] ul`));
+                } else if (!needed && existing) {
+                    existing.remove();
+                }
+            });
+            // drop blocks for platforms that are no longer visible at all (e.g. site just disabled)
+            hltbLeisureOrderWrap.querySelectorAll(".hltb_leisure_order_block").forEach(block => {
+                if (!visiblePlatforms().includes(block.dataset.platform)) block.remove();
+            });
+        }
+
         function renderPlacementSelects() {
             const shared = sharedToggle.checked;
-            const platforms = shared ? NS.PLATFORMS.filter(p => currentEnabledMap()[p]).slice(0, 1) : NS.PLATFORMS.filter(p => currentEnabledMap()[p]);
+            const platforms = visiblePlatforms();
             renderPlatformSelects(positionSelects, "badgePosition", NS.BADGE_POSITION_OPTIONS, p => NS.getBadgePositionFor(p), platforms, shared);
             renderPlatformSelects(hltbLocationSelects, "hltbLocation", NS.LOCATION_OPTIONS, p => NS.getSectionLocationFor("hltb", p), platforms, shared);
             renderPlatformSelects(leisureLocationSelects, "leisureLocation", NS.LOCATION_OPTIONS, p => NS.getSectionLocationFor("leisure", p), platforms, shared);
+            hltbLeisureOrderWrap.innerHTML = platforms.map(p => {
+                const hltbCur = NS.getSectionLocationFor("hltb", p), leisureCur = NS.getSectionLocationFor("leisure", p);
+                if (!hltbLeisureOrderNeeded(hltbCur, leisureCur)) return "";
+                return hltbLeisureOrderBlockHtml(p, shared ? "Steam + Epic" : p, NS.getHltbLeisureOrderFor(p));
+            }).join("");
+            hltbLeisureOrderWrap.querySelectorAll(".hltb_leisure_order_block ul").forEach(wireDragReorder);
+            hltbLocationSelects.querySelectorAll("select").forEach(sel => sel.addEventListener("change", syncHltbLeisureOrderWrap));
+            leisureLocationSelects.querySelectorAll("select").forEach(sel => sel.addEventListener("change", syncHltbLeisureOrderWrap));
         }
 
         renderToggles(toggleList);
@@ -145,7 +198,7 @@
             enableList.querySelectorAll("input[data-site-enable]").forEach(input => NS.setSiteEnabled(input.dataset.siteEnable, input.checked));
             NS.setPlacementShared(sharedToggle.checked);
             const shared = sharedToggle.checked;
-            const platforms = shared ? NS.PLATFORMS.filter(p => currentEnabledMap()[p]).slice(0, 1) : NS.PLATFORMS.filter(p => currentEnabledMap()[p]);
+            const platforms = visiblePlatforms();
             platforms.forEach(platform => {
                 const targets = shared ? NS.PLATFORMS : [platform];
                 const posSel = document.getElementById("sel_badgePosition" + platform);
@@ -154,6 +207,11 @@
                     const sel = document.getElementById("sel_" + k + "Location" + platform);
                     if (sel) targets.forEach(p => NS.setSectionLocationFor(k, p, sel.value));
                 });
+                const orderBlock = hltbLeisureOrderWrap.querySelector(`.hltb_leisure_order_block[data-platform="${platform}"]`);
+                if (orderBlock) {
+                    const order = Array.from(orderBlock.querySelectorAll(".order_item")).map(li => li.dataset.key);
+                    targets.forEach(p => NS.setHltbLeisureOrderFor(p, order));
+                }
             });
             saveStatus.textContent = "Saved ✓";
             saveStatus.classList.add("visible");

@@ -103,6 +103,72 @@
         const targetObj = NS.getTargetInsertionPoint(location);
         if (targetObj) insertAtTarget(makeCtn(className, BADGE_STYLE, html), targetObj);
     };
+    // HLTB is available synchronously (parsed off the IGN page); Leisure Time needs its own async
+    // fetch that resolves later. When both are placed at the same non-inline location, they need to
+    // render as ONE combined element (ordered per NS.getHltbLeisureOrder()) rather than two
+    // independently-inserted ones racing each other — so HLTB rendering is deferred here and
+    // finished off by placeLeisureAndFinalize/finalizeHltbStandalone once Leisure resolves (or is
+    // determined not to apply). pendingCombine also doubles as the signal that a deferral is
+    // in-flight, and clearing all three possible standalone classNames on every transition (rather
+    // than just the one currently relevant) is what prevents stale copies surviving a settings
+    // change — e.g. moving Leisure from "Below Game Media" back to "Inline" used to leave the old
+    // standalone element behind forever, since nothing else ever targeted its className.
+    let pendingCombine = null;
+    function clearAllHltbLeisureStandalones() {
+        document.querySelector(".ign_hltb_standalone")?.remove();
+        document.querySelector(".ign_leisure_standalone")?.remove();
+        document.querySelector(".ign_hltb_leisure_standalone")?.remove();
+    }
+    function placeHltbSection(hltbHtml, hltbLoc, leisureLoc) {
+        if (hltbLoc === "inline") {
+            pendingCombine = null;
+            document.querySelector(".ign_hltb_standalone")?.remove();
+            document.querySelector(".ign_hltb_leisure_standalone")?.remove();
+            return hltbHtml;
+        }
+        if (hltbLoc === leisureLoc && NS.getConfig("showLeisure")) {
+            pendingCombine = { hltbHtml, loc: hltbLoc };
+            document.querySelector(".ign_hltb_standalone")?.remove();
+            return "";
+        }
+        pendingCombine = null;
+        document.querySelector(".ign_hltb_leisure_standalone")?.remove();
+        NS.renderStandalone("ign_hltb_standalone", hltbHtml, hltbLoc);
+        return "";
+    }
+    // Called once Leisure Time data (if any) has resolved. Combines with a deferred HLTB section
+    // when they share a location, otherwise places Leisure on its own.
+    NS.placeLeisureAndFinalize = function placeLeisureAndFinalize(leisureHtml, leisureLoc) {
+        if (pendingCombine && pendingCombine.loc === leisureLoc) {
+            const order = NS.getHltbLeisureOrder();
+            const htmlByKey = { hltb: pendingCombine.hltbHtml, leisure: leisureHtml };
+            const combinedHtml = order.map(key => htmlByKey[key] || "").join("");
+            pendingCombine = null;
+            clearAllHltbLeisureStandalones();
+            if (!combinedHtml) return;
+            const targetObj = NS.getTargetInsertionPoint(leisureLoc);
+            if (targetObj) insertAtTarget(makeCtn("ign_hltb_leisure_standalone", BADGE_STYLE, combinedHtml), targetObj);
+        } else {
+            document.querySelector(".ign_hltb_leisure_standalone")?.remove();
+            NS.renderStandalone("ign_leisure_standalone", leisureHtml, leisureLoc);
+        }
+    };
+    // Leisure is inline, disabled, or was never fetched — any HLTB section that was deferred
+    // waiting to be combined with it needs to render on its own instead.
+    NS.finalizeHltbStandalone = function finalizeHltbStandalone() {
+        if (!pendingCombine) return;
+        const { hltbHtml, loc } = pendingCombine;
+        pendingCombine = null;
+        document.querySelector(".ign_hltb_leisure_standalone")?.remove();
+        NS.renderStandalone("ign_hltb_standalone", hltbHtml, loc);
+    };
+    // Leisure just rendered inline — clear out any stray standalone copies left over from a
+    // previous (non-inline) location setting.
+    NS.clearLeisureStandalones = function clearLeisureStandalones() {
+        document.querySelector(".ign_leisure_standalone")?.remove();
+        document.querySelector(".ign_hltb_leisure_standalone")?.remove();
+        if (pendingCombine) { const { hltbHtml, loc } = pendingCombine; pendingCombine = null; NS.renderStandalone("ign_hltb_standalone", hltbHtml, loc); }
+    };
     function buildSectionHtml(map) { return NS.getSectionOrder().map(key => map[key] || "").join(""); }
     NS.renderCompleteBadge = function renderCompleteBadge(ignScore, userScore, hltbData, hltbUrl, developerName, esrbImgSrc, esrbAlt, esrbDescriptors, awardData, ignUrl, fetchedGameTitle = "") {
         if (!NS.getTargetInsertionPoint()) return null;
@@ -115,18 +181,18 @@
         const resolvedHltbUrl = resolveHltbUrl(hltbUrl, displayName);
         const hltbLoc = NS.getSectionLocation("hltb"), leisureLoc = NS.getSectionLocation("leisure");
         const hltbHtml = buildHltbRow(hltbData, resolvedHltbUrl);
+        const inlineHltbHtml = placeHltbSection(hltbHtml, hltbLoc, leisureLoc);
         const mainHtml = buildSectionHtml({
             scores: buildTopRow(ignScore, userScore, ignUrl, displayName),
             steamReviews: buildSteamReviewsRow(NS.extractSteamReviews()),
             award: buildAwardRow(awardData),
             esrb: buildEsrbRow(esrbImgSrc, esrbAlt, esrbDescriptors),
             developer: buildDevRow(developerName),
-            hltb: hltbLoc === "inline" ? hltbHtml : "",
+            hltb: inlineHltbHtml,
             leisure: (leisureLoc === "inline" && NS.getConfig("showLeisure")) ? '<div class="ign_leisure_placeholder"></div>' : ""
         });
         const hasRealContent = !!mainHtml.replace(/<div class="ign_leisure_placeholder"><\/div>/g, "").trim();
         if (hasRealContent) insertBadge(makeCtn("ign_rating_row", BADGE_STYLE, mainHtml));
-        NS.renderStandalone("ign_hltb_standalone", hltbLoc === "inline" ? "" : hltbHtml, hltbLoc);
         if (!hasRealContent && hltbLoc === "inline") return null;
         return resolvedHltbUrl;
     };
@@ -138,17 +204,17 @@
         const resolvedHltbUrl = p ? resolveHltbUrl(p.hltbUrl, gameTitle) : "";
         const hltbLoc = NS.getSectionLocation("hltb"), leisureLoc = NS.getSectionLocation("leisure");
         const hltbHtml = p ? buildHltbRow(p.hltbData, resolvedHltbUrl) : "";
+        const inlineHltbHtml = p ? placeHltbSection(hltbHtml, hltbLoc, leisureLoc) : "";
         const mainHtml = buildSectionHtml({
             scores: buildMultiGameTopRow(games),
             steamReviews: buildSteamReviewsRow(NS.extractSteamReviews()),
             award: p ? buildAwardRow(p.awardData) : "",
             esrb: p ? buildEsrbRow(p.esrbImgSrc, p.esrbAlt, p.esrbDescriptors) : "",
             developer: p ? buildDevRow(p.developerName) : "",
-            hltb: (p && hltbLoc === "inline") ? hltbHtml : "",
+            hltb: inlineHltbHtml,
             leisure: (p && leisureLoc === "inline" && NS.getConfig("showLeisure")) ? '<div class="ign_leisure_placeholder"></div>' : ""
         });
         insertBadge(makeCtn("ign_rating_row", BADGE_STYLE, mainHtml));
-        if (p) NS.renderStandalone("ign_hltb_standalone", hltbLoc === "inline" ? "" : hltbHtml, hltbLoc);
         return p ? resolvedHltbUrl : "";
     };
     NS.fillLeisurePlaceholder = function fillLeisurePlaceholder(html) {
