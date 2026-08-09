@@ -14,7 +14,7 @@ Injects IGN data inside Steam and Epic's game page.
 - Source overrides for unavailable games
 - Choose which item you want in your main page
 - Supports both Steam and Epic stores
-- Allows you to select individual preferences for each store.
+- Select individual preferences for each store.
   
 <p align="center">
   <img src="https://github.com/user-attachments/assets/8967d059-8a40-47bd-8053-ac3764a723ce" alt="Epic version" width="49%" height="300" style="object-fit: cover;" />
