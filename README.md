@@ -57,7 +57,7 @@ So, the idea is to make Steam app open the main chromium browser from which we c
 - Now go to the URL bar and type `https://chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh?hl=en` or a link to any chrome webstore extension.
 - Click `Add to Chrome`.
 - A popup will appear asking you to save. Choose any location, it does not matter in our case.
-- Now the extension will be installed and a new Chromium window will appear. This is where we can follow steps from [#Chrome/Chromium](https://github.com/alphaxleonidas/IGN-Metadata-Injector/tree/main#chromechromium)
+- Now the extension will be installed and a new Chromium window will appear. This is where we can follow steps from [#Chrome/Chromium](https://github.com/alphaxleonidas/IGN-Metadata-Injector#chromechromium)
 # Firefox 
 - Download the `firefox` version from the [Releases](https://github.com/alphaxleonidas/IGN-Metadata-Injector/releases) section
 - Open `about:config`
