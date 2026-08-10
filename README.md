@@ -23,7 +23,6 @@ Injects IGN data inside Steam and Epic's game page.
   - IGN Review Summary
   - IGN Review Grading
   - Genres
-  - IGN Guide link
   - Platforms
   - Selection of individual element location
   - Toggle all elements in a single place
