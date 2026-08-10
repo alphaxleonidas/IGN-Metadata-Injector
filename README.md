@@ -15,7 +15,20 @@ Injects IGN data inside Steam and Epic's game page.
 - Choose which item you want in your main page
 - Supports both Steam and Epic stores
 - Select individual preferences for each store.
-  
+
+  **Plan**
+  - Better searching and name detection
+  - ESRB Rating description
+  - IGN Game Summary
+  - IGN Review Summary
+  - IGN Review Grading
+  - Genres
+  - IGN Guide link
+  - Platforms
+  - Selection of individual element location
+  - Toggle all elements in a single place
+  - Optimization
+    
 <p align="center">
   <img src="https://github.com/user-attachments/assets/8967d059-8a40-47bd-8053-ac3764a723ce" alt="Epic version" width="49%" height="300" style="object-fit: cover;" />
   <img src="https://github.com/user-attachments/assets/a06a1d09-3976-4c17-a5b6-292e84059506" alt="Steam version" width="49%" height="300" style="object-fit: cover;" />
