@@ -46,6 +46,8 @@ Injects IGN data inside Steam and Epic's game page.
  
    **Requirements:** Tampermonkey or some userscript manager
 
+ - Supports auto-updates
+
 # Chrome/Chromium 
 
 - Download the `chromium` version from the [Releases](https://github.com/alphaxleonidas/IGN-Metadata-Injector/releases) section
