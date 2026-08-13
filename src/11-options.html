@@ -10,19 +10,23 @@
         <h1>IGN Metadata Injector</h1>
         <p class="sub">Settings apply immediately on save — no need to reload Steam/Epic tabs that are already open (they'll pick it up on next page change).</p>
 
-        <div class="columns">
-            <section>
-                <h2>Visible Sections</h2>
-                <div id="toggle_list"></div>
-                <h2 style="margin-top:20px;">Enable / Disable Per Site</h2>
-                <div id="enable_list"></div>
-            </section>
-            <section>
-                <h2>Section Order (drag to reorder)</h2>
-                <p class="sub">HowLongToBeat / HLTB Leisure Time order only applies when their Location below is set to "Inline" — when they share the same non-inline Location instead, a separate order picker appears below the location selects.</p>
-                <ul id="order_list"></ul>
-            </section>
-        </div>
+        <section class="full">
+            <div class="order_list_header"><span class="separate_col_label">Separate Entry</span><h2>Section Order (drag to reorder)</h2><span class="visible_col_label">Visible</span></div>
+            <ul id="order_list"></ul>
+            <label class="toggle_row" style="border-bottom:none;margin-top:4px;">
+                <span>Combine all entries in one place</span>
+                <span class="switch">
+                    <input type="checkbox" id="combine_all">
+                    <span class="switch_slider"></span>
+                </span>
+            </label>
+            <div class="locations_row" id="combine_all_locations" style="margin-top:8px;display:none;"></div>
+        </section>
+
+        <section class="full">
+            <h2>Enable / Disable Per Site</h2>
+            <div id="enable_list"></div>
+        </section>
 
         <section class="full">
             <label class="toggle_row" style="border-bottom:none;">
@@ -35,30 +39,17 @@
         </section>
 
         <section class="full">
-            <h2>Overlay Position</h2>
+            <h2 id="position_heading">Overlay Position</h2>
             <div class="locations_row" id="position_selects"></div>
         </section>
 
-        <section class="full locations_row">
-            <div>
-                <h2>HowLongToBeat Location</h2>
-                <div class="locations_row" id="hltb_location_selects"></div>
-            </div>
-            <div>
-                <h2>HLTB Leisure Time Location</h2>
-                <div class="locations_row" id="leisure_location_selects"></div>
-            </div>
-        </section>
+        <section class="full" id="key_locations_wrap"></section>
 
-        <section class="full" id="hltb_leisure_order_wrap"></section>
+        <section class="full" id="shared_location_notes"></section>
 
         <section class="full">
             <h2>Per-Title Overrides</h2>
-            <p class="sub">
-                For games that won't auto-resolve: force an exact IGN page and/or an exact
-                HowLongToBeat page for one title. Matched by exact title (case-insensitive).
-                Added/removed immediately — no need to hit Save below.
-            </p>
+            <p class="sub">Add/Override IGN/HowLongToBeat data. Useful when no data is found.</p>
             <ul id="override_list"></ul>
             <p id="override_empty" class="empty" hidden>No overrides added yet.</p>
             <div class="override_form">

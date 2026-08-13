@@ -89,7 +89,11 @@
             return fetchPackageItems(packageNames, gameTitle, dedicatedEntry);
         }
         const finishRender = (hltbData, hltbUrl) => {
-            const resolvedHltbUrl = NS.renderCompleteBadge(p.ignScore, p.userScore, hltbData, hltbUrl, p.developerName, p.esrbImgSrc, p.esrbAlt, p.esrbDescriptors, p.awardData, targetUrl, p.fetchedGameTitle);
+            const resolvedHltbUrl = NS.renderCompleteBadge(p.ignScore, p.userScore, hltbData, hltbUrl, p.developerName, p.esrbImgSrc, p.esrbAlt, p.esrbDescriptors, p.awardData, targetUrl, p.fetchedGameTitle, {
+                description: p.description, genres: p.genres, platforms: p.platforms, publisherName: p.publisherName, features: p.features,
+                reviewGradingText: p.reviewGradingText, reviewGradingBadge: p.reviewGradingBadge,
+                reviewSummaryText: p.reviewSummaryText, reviewUrl: p.reviewUrl
+            });
             NS.state.isFetching = false;
             attachLeisureSection(resolvedHltbUrl);
         };

@@ -1,16 +1,26 @@
 (function (NS) {
     "use strict";
     const cleanSteamTitle = raw => raw.replace(/^Save \d+% on /i, "").replace(/^Pre-purchase /i, "").replace(/ on Steam$/i, "").trim();
+    // Demo listings are separate store pages from the full game (e.g. "Ratchet & Clank: Rift Apart
+    // Demo") but should still resolve to the full game's IGN/HLTB data, so "Demo" is stripped from
+    // whatever title gets used for matching/display.
+    const stripDemoSuffix = title => title.replace(/[\s:-]*\bdemo\b\s*$/i, "").trim();
     NS.getGameTitle = function getGameTitle() {
+        let title = null;
         if (NS.IS_STEAM) {
             const titleEl = document.getElementById("appHubAppName") || document.querySelector(".page_title_area .apphub_AppName") || document.querySelector(".app_header_content .app_name");
-            if (titleEl && titleEl.textContent.trim()) return titleEl.textContent.trim();
-            const ogTitle = document.querySelector('meta[property="og:title"]');
-            if (ogTitle && ogTitle.content) { const title = cleanSteamTitle(ogTitle.content.trim()); if (title) return title; }
-            if (document.title) { const title = cleanSteamTitle(document.title); if (title && title !== "Steam") return title; }
+            if (titleEl && titleEl.textContent.trim()) title = titleEl.textContent.trim();
+            if (!title) {
+                const ogTitle = document.querySelector('meta[property="og:title"]');
+                if (ogTitle && ogTitle.content) { const t = cleanSteamTitle(ogTitle.content.trim()); if (t) title = t; }
+            }
+            if (!title && document.title) { const t = cleanSteamTitle(document.title); if (t && t !== "Steam") title = t; }
         }
-        if (NS.IS_EPIC) { const h1El = document.querySelector("h1") || document.querySelector('[data-testid="pdp-title"]'); if (h1El) return h1El.textContent.trim(); }
-        return null;
+        if (!title && NS.IS_EPIC) {
+            const h1El = document.querySelector("h1") || document.querySelector('[data-testid="pdp-title"]');
+            if (h1El) title = h1El.textContent.trim();
+        }
+        return title ? stripDemoSuffix(title) : null;
     };
     NS.extractSteamReviews = function extractSteamReviews() {
         if (!NS.IS_STEAM) return [];
@@ -73,7 +83,13 @@
             if (pref === "aboveTitle") { const titleArea = document.querySelector(".page_title_area.game_title_area") || document.querySelector(".page_title_area"); if (titleArea) return { element: NS.findSafeBeforeTarget(titleArea), position: "before" }; }
             if (pref === "sidebarBottom" || pref === "belowRightSidebarMetadata" || pref === "aboveRightSidebarMetadata") { const sidebar = document.querySelector(".rightcol.game_meta_data") || document.querySelector(".game_meta_data"); if (sidebar) return { element: sidebar, position: pref === "aboveRightSidebarMetadata" ? "prepend" : "append" }; }
             if (pref === "abovePrice") { const purchaseArea = document.querySelector("#game_area_purchase"); if (purchaseArea) return { element: purchaseArea, position: "before" }; }
-            if (pref === "belowGameMedia") { const media = document.querySelector(".highlight_ctn"); if (media) return { element: media, position: "after", alignTo: media }; }
+            if (pref === "belowGameMedia") {
+                const media = document.querySelector(".highlight_ctn");
+                // Align width/position to .highlight_overflow (the actual clipped carousel bounds)
+                // rather than .highlight_ctn itself — the outer wrapper's own measured rect runs
+                // wider than the visible media, which was stretching the badge too far right.
+                if (media) return { element: media, position: "after", alignTo: media.querySelector(".highlight_overflow") || media };
+            }
             if (pref === "belowLeftSidebar") {
                 // Anchored on "System Requirements" (.sys_req + its fade/read-more overlay share one
                 // .game_page_autocollapse_ctn wrapper) — stays inside .leftcol's normal flow, so no

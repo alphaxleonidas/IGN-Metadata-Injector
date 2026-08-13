@@ -73,23 +73,83 @@
             const smallScoreEls = doc.querySelectorAll('[data-cy="score-rating-small"]');
             if (smallScoreEls.length > 0) userScore = smallScoreEls[smallScoreEls.length - 1].textContent.trim();
         }
+        // Everything below comes from the page's object summary box (ratings, description, genres,
+        // platforms, developer/publisher, features) — scoped to that one container rather than the
+        // whole document, since IGN game pages can repeat similar-looking widgets elsewhere (e.g.
+        // franchise/related-game rails) that would otherwise be matched by mistake, silently pulling
+        // in another title's rating/descriptors or leaving them blank.
+        const summaryBox = doc.querySelector('[data-cy="object-summary-box"]') || doc;
         let developerName = "";
-        const devEl = doc.querySelector('[data-cy="developerLink"]') || doc.querySelector('a[href*="/games/developer/"]') ||
-            doc.querySelector('[data-cy="producerLink"]') || doc.querySelector('a[href*="/games/producer/"]');
+        const devEl = summaryBox.querySelector('[data-cy="developers-info"] [data-cy="developerLink"]') ||
+            summaryBox.querySelector('[data-cy="developers-info"] [data-cy="producerLink"]') ||
+            summaryBox.querySelector('[data-cy="developers-info"] a');
         if (devEl && devEl.textContent.trim()) developerName = devEl.textContent.trim();
+        let publisherName = "";
+        const pubEl = summaryBox.querySelector('[data-cy="publishers-info"] [data-cy="publisherLink"]') ||
+            summaryBox.querySelector('[data-cy="publishers-info"] a');
+        if (pubEl && pubEl.textContent.trim()) publisherName = pubEl.textContent.trim();
+        // ESRB: the object summary box nests the age-rating link/img and its descriptors text as
+        // ["ESRB: E10+" title / "ESRB: Everyone 10+" img alt] on an <a data-cy="object-age-rating">,
+        // with the descriptor text in a sibling data-cy="content-rating-description" block — not
+        // baked into the alt text itself, so it's read separately here rather than split out of it.
         let esrbImgSrc = "", esrbAlt = "", esrbDescriptors = "";
-        const esrbImgEl = doc.querySelector('img[data-cy^="icon-esrb"]') || doc.querySelector('img[alt*="ESRB:"]');
-        if (esrbImgEl) { esrbImgSrc = esrbImgEl.getAttribute("src"); esrbAlt = esrbImgEl.getAttribute("alt") || "ESRB Rating"; }
+        const ageRatingEl = summaryBox.querySelector('a[data-cy="object-age-rating"]');
+        if (ageRatingEl) {
+            const img = ageRatingEl.querySelector("img");
+            if (img) { esrbImgSrc = img.getAttribute("src") || ""; esrbAlt = img.getAttribute("alt") || ""; }
+            if (!esrbAlt) esrbAlt = ageRatingEl.getAttribute("title") || "";
+            const descEl = ageRatingEl.parentElement && ageRatingEl.parentElement.querySelector('[data-cy="content-rating-description"]');
+            if (descEl) esrbDescriptors = descEl.textContent.trim();
+        } else {
+            const esrbImgEl = summaryBox.querySelector('img[data-cy^="icon-esrb"]') || summaryBox.querySelector('img[alt*="ESRB:"]');
+            if (esrbImgEl) { esrbImgSrc = esrbImgEl.getAttribute("src"); esrbAlt = esrbImgEl.getAttribute("alt") || "ESRB Rating"; }
+        }
         if (esrbAlt && esrbAlt.includes(":")) {
             const [firstPart, ...rest] = esrbAlt.split(":");
             const label = firstPart.trim(), remainder = rest.join(":").trim();
             if (/^esrb$/i.test(label)) esrbAlt = remainder;
-            else { esrbAlt = label; esrbDescriptors = remainder; }
+            else { esrbAlt = label; if (!esrbDescriptors) esrbDescriptors = remainder; }
         }
         esrbAlt = NS.normalizeEsrbLabel(esrbAlt);
         if (!esrbDescriptors) {
-            const descContainer = doc.querySelector('[data-cy*="esrb-descriptors"]') || doc.querySelector(".esrb-descriptors");
+            const descContainer = summaryBox.querySelector('[data-cy*="esrb-descriptors"]') || summaryBox.querySelector(".esrb-descriptors");
             if (descContainer) esrbDescriptors = descContainer.textContent.trim();
+        }
+        // Game description: the object summary box's own blurb, not the ESRB content-rating-description
+        // (same data-cy value is reused for both — this one lives inside data-cy="summary-info").
+        let description = "";
+        const descriptionEl = summaryBox.querySelector('[data-cy="summary-info"] [data-cy="content-rating-description"]');
+        if (descriptionEl) description = descriptionEl.textContent.trim();
+        const genres = [];
+        summaryBox.querySelectorAll('[data-cy="genres-info"] a[data-cy="genreLink"]').forEach(a => { const t = a.textContent.trim(); if (t) genres.push(t); });
+        const features = [];
+        summaryBox.querySelectorAll('[data-cy="features-info"] a[data-cy="featureLink"]').forEach(a => { const t = a.textContent.trim(); if (t) features.push(t); });
+        const platforms = [];
+        summaryBox.querySelectorAll('[data-cy="platforms-info"] a.platform-icon').forEach(a => {
+            const img = a.querySelector("img");
+            const name = a.getAttribute("title") || (img && img.getAttribute("alt")) || "";
+            if (name) platforms.push({ name, iconSrc: img ? img.getAttribute("src") : "" });
+        });
+        // Critic review card (score hexagon + "amazing"-style grading text + Editors' Choice badge +
+        // review blurb/link) — scoped strictly to .review-details, which only exists on pages that
+        // actually have a review. No review card means no grading data at all, rather than falling
+        // back to a document-wide search: data-cy="title1"/"article-subtitle" etc. are reused by
+        // unrelated widgets elsewhere on the page (e.g. a "<Game> News" teaser card), so searching
+        // the whole document when there's no review picked up that unrelated content instead.
+        let reviewGradingText = "", reviewGradingBadge = "", reviewSummaryText = "", reviewUrl = "";
+        const reviewRoot = doc.querySelector(".review-details");
+        if (reviewRoot) {
+            const gradingEl = reviewRoot.querySelector('[data-cy="title1"]');
+            if (gradingEl) reviewGradingText = gradingEl.textContent.trim();
+            const badgeEl = reviewRoot.querySelector(".tag [data-cy=\"caption\"]");
+            if (badgeEl) reviewGradingBadge = badgeEl.textContent.trim();
+            const subtitleEl = reviewRoot.querySelector('[data-cy="article-subtitle"]');
+            if (subtitleEl) reviewSummaryText = subtitleEl.textContent.trim();
+            const reviewLinkEl = reviewRoot.querySelector('[data-cy="article-review-link"]');
+            if (reviewLinkEl) {
+                const href = reviewLinkEl.getAttribute("href") || "";
+                if (href) reviewUrl = /^https?:\/\//i.test(href) ? href : `https://www.ign.com${href.startsWith("/") ? "" : "/"}${href}`;
+            }
         }
         let awardData = null;
         const awardEl = doc.querySelector('figure[data-cy="review-score"].icon-award') || doc.querySelector('[class*="icon-award"]');
@@ -110,7 +170,10 @@
             if (hltbLinkEl) hltbUrl = hltbLinkEl.getAttribute("href");
         }
         if (!hltbUrl) { const anyHltbLink = doc.querySelector('a[href*="howlongtobeat.com"]'); if (anyHltbLink) hltbUrl = anyHltbLink.getAttribute("href"); }
-        return { fetchedGameTitle, ignScore, userScore, developerName, esrbImgSrc, esrbAlt, esrbDescriptors, awardData, hltbData, hltbUrl };
+        return {
+            fetchedGameTitle, ignScore, userScore, developerName, publisherName, esrbImgSrc, esrbAlt, esrbDescriptors, awardData, hltbData, hltbUrl,
+            description, genres, features, platforms, reviewGradingText, reviewGradingBadge, reviewSummaryText, reviewUrl
+        };
     };
     NS.resolveFirstWorkingUrl = function resolveFirstWorkingUrl(candidateUrls, callback) {
         function tryNext(index) {

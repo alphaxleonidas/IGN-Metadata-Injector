@@ -1,23 +1,39 @@
 (function(NS) {
     "use strict";
     const CONFIG_KEYS = {
-        showIgnScore: "Show IGN Score", showUserRating: "Show User Rating", showSteamReviews: "Show Steam Reviews",
+        showIgnScore: "Show IGN Score", showUserRating: "Show User Rating", showReviewGrading: "Show Review Grading",
+        showReview: "Show Review Summary", showSteamReviews: "Show Steam Reviews",
         showAward: "Show IGN Award / Leaderboard", showEsrb: "Show ESRB Rating & Descriptors", showDeveloper: "Show Developer",
-        showHltb: "Show HowLongToBeat", showLeisure: "Show HLTB Leisure Times"
+        showPublisher: "Show Publisher", showGenres: "Show Genres", showPlatforms: "Show Platforms", showFeatures: "Show Features",
+        showDescription: "Show Game Description", showHltb: "Show HowLongToBeat", showLeisure: "Show HLTB Leisure Times"
     };
     const CONFIG_DEFAULTS = {
-        showIgnScore: true, showUserRating: true, showSteamReviews: true, showAward: true,
-        showEsrb: true, showDeveloper: true, showHltb: true, showLeisure: true
+        showIgnScore: true, showUserRating: true, showReviewGrading: true, showReview: true, showSteamReviews: true, showAward: true,
+        showEsrb: true, showDeveloper: false, showPublisher: false, showGenres: true, showPlatforms: true, showFeatures: false,
+        showDescription: true, showHltb: true, showLeisure: true
     };
     NS.CONFIG_KEYS = CONFIG_KEYS;
     NS.CONFIG_DEFAULTS = CONFIG_DEFAULTS;
     NS.getConfig = key => NS.storage.getSync(key, CONFIG_DEFAULTS[key]);
     const SECTION_LABELS = {
-        scores: "IGN Score / User Rating", steamReviews: "Steam Reviews", award: "Leaderboard Rank",
-        esrb: "ESRB Rating", developer: "Developer", hltb: "HowLongToBeat", leisure: "HLTB Leisure Time"
+        scores: "IGN Score / User Rating", reviewGrading: "Review Grading", review: "Review Summary", steamReviews: "Steam Reviews", award: "Leaderboard Rank",
+        esrb: "ESRB Rating", developer: "Developer", publisher: "Publisher", genres: "Genres", platforms: "Platforms", features: "Features", description: "Game Description",
+        hltb: "HowLongToBeat", leisure: "HLTB Leisure Time"
     };
-    const DEFAULT_SECTION_ORDER = [ "scores", "steamReviews", "award", "esrb", "developer", "hltb", "leisure" ];
+    // Which "Show ..." config toggle(s) a given section corresponds to — almost always one, except
+    // "scores" which folds two independently-toggleable rows (IGN Score, User Rating) into a single
+    // order-list row. Drives the merged Visible/Separate/Section-Order list in the settings UI: a
+    // row's "Visible" checkbox reads as checked if any of its keys are on, and toggling it writes
+    // that same state to all of them.
+    const SECTION_CONFIG_KEYS = {
+        scores: ["showIgnScore", "showUserRating"], reviewGrading: ["showReviewGrading"], review: ["showReview"],
+        steamReviews: ["showSteamReviews"], award: ["showAward"], esrb: ["showEsrb"], developer: ["showDeveloper"],
+        publisher: ["showPublisher"], genres: ["showGenres"], platforms: ["showPlatforms"], features: ["showFeatures"],
+        description: ["showDescription"], hltb: ["showHltb"], leisure: ["showLeisure"]
+    };
+    const DEFAULT_SECTION_ORDER = [ "scores", "reviewGrading", "award", "review", "steamReviews", "esrb", "developer", "publisher", "genres", "platforms", "features", "description", "hltb", "leisure" ];
     NS.SECTION_LABELS = SECTION_LABELS;
+    NS.SECTION_CONFIG_KEYS = SECTION_CONFIG_KEYS;
     NS.DEFAULT_SECTION_ORDER = DEFAULT_SECTION_ORDER;
     NS.getSectionOrder = function getSectionOrder() {
         const stored = NS.storage.getSync("sectionOrder", null);
@@ -30,7 +46,7 @@
         { value: "default", label: "Default" }, { value: "aboveTitle", label: "Above Game Title" },
         { value: "belowGameMedia", label: "Below Game Media" },
         { value: "abovePrice", label: "Steam: Above Game Price | Epic: Above Game Description" },
-        { value: "belowLeftSidebar", label: "Below Left Sidebar" },
+        { value: "belowLeftSidebar", label: "Bottom of Left Sidebar" },
         { value: "aboveRightSidebarMetadata", label: "Above Right Side Metadata" },
         { value: "belowRightSidebarMetadata", label: "Below Right Side Metadata" },
         { value: "sidebarBottom", label: "Bottom of Right Sidebar" }
@@ -57,19 +73,33 @@
     // Independent placement for HLTB / Leisure: 'inline' (default, inside the main badge) or any of
     // the positions above, rendered as their own element.
     NS.LOCATION_OPTIONS = [{ value: "inline", label: "Inline (Default)" }, ...NS.BADGE_POSITION_OPTIONS];
-    NS.getSectionLocationFor = (key, platform) => NS.storage.getSync(key + "Location" + platform, "inline");
+    // HLTB/Leisure default to "Below Game Media" rather than inline like everything else, since
+    // their stat-block layout reads better as its own element than folded into the main badge.
+    const DEFAULT_SECTION_LOCATIONS = { hltb: "belowGameMedia", leisure: "belowGameMedia" };
+    NS.getSectionLocationFor = (key, platform) => NS.storage.getSync(key + "Location" + platform, DEFAULT_SECTION_LOCATIONS[key] || "inline");
     NS.setSectionLocationFor = (key, platform, value) => NS.storage.set(key + "Location" + platform, value);
-    NS.getSectionLocation = key => NS.getSectionLocationFor(key, currentPlatform());
-    NS.setSectionLocation = (key, value) => NS.setSectionLocationFor(key, currentPlatform(), value);
-    // Order between HLTB and HLTB Leisure Time specifically, used only when both are placed at the
-    // same non-inline location (they'd otherwise render as two independent standalone elements with
-    // no defined relative order). Values are ["hltb","leisure"] or ["leisure","hltb"].
-    NS.getHltbLeisureOrderFor = platform => {
-        const stored = NS.storage.getSync("hltbLeisureOrder" + platform, null);
-        return Array.isArray(stored) && stored.length === 2 && stored.includes("hltb") && stored.includes("leisure") ? stored : ["hltb", "leisure"];
+    // "Combine all entries in one place": a per-platform override that, when on, forces EVERY
+    // section (regardless of its own individually-configured Location) to the single chosen
+    // combineLocation instead — the existing "combine sections that share a Location" rendering
+    // behavior then naturally merges all of them together since they now all resolve to the same
+    // spot. Turning it back off simply stops overriding, restoring whatever each section's own
+    // Location was already set to (nothing is overwritten in storage).
+    NS.getCombineAllFor = platform => NS.storage.getSync("combineAll" + platform, false);
+    NS.setCombineAllFor = (platform, value) => NS.storage.set("combineAll" + platform, value);
+    NS.getCombineAll = () => NS.getCombineAllFor(currentPlatform());
+    NS.getCombineLocationFor = platform => NS.storage.getSync("combineLocation" + platform, "belowGameMedia");
+    NS.setCombineLocationFor = (platform, value) => NS.storage.set("combineLocation" + platform, value);
+    NS.getCombineLocation = () => NS.getCombineLocationFor(currentPlatform());
+    NS.getSectionLocation = key => {
+        const platform = currentPlatform();
+        return NS.getCombineAllFor(platform) ? NS.getCombineLocationFor(platform) : NS.getSectionLocationFor(key, platform);
     };
-    NS.setHltbLeisureOrderFor = (platform, order) => NS.storage.set("hltbLeisureOrder" + platform, order);
-    NS.getHltbLeisureOrder = () => NS.getHltbLeisureOrderFor(currentPlatform());
+    NS.setSectionLocation = (key, value) => NS.setSectionLocationFor(key, currentPlatform(), value);
+    // Relative order between two or more sections that end up sharing the exact same non-inline
+    // Location (e.g. HLTB + Leisure Time, or any other pair/group) is no longer tracked by its own
+    // separate storage — it's simply their relative order in NS.getSectionOrder(), the same list
+    // that already controls everything else. See placeSimpleSections()/placeLeisureAndFinalize() in
+    // 05-badge-render.js.
     NS.getUserOverrides = () => NS.storage.getSync("userTitleOverrides", {});
     NS.setUserOverrides = overridesObj => NS.storage.set("userTitleOverrides", overridesObj);
     NS.setUserOverride = function setUserOverride(title, ignUrl, hltbUrl) {
