@@ -1,7 +1,7 @@
 {
   "name": "ign-metadata-injector",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Build tooling for the IGN Metadata Injector userscript/extension.",
   "scripts": {
     "build": "node build.js"
