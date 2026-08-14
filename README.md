@@ -23,9 +23,6 @@ Injects IGN data inside Steam and Epic's game page.
 - Platforms
 - Selection of individual element location
 - Toggle all elements in a single place
-
- **Plan**:
- - Better searching
    
 <p align="center">
   <img src="https://github.com/user-attachments/assets/8967d059-8a40-47bd-8053-ac3764a723ce" alt="Epic version" width="49%" height="300" style="object-fit: cover;" />
