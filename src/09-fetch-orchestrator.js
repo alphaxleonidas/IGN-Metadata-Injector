@@ -26,6 +26,11 @@
         }
         fetchNext(0);
     }
+    // Resolves a store title to an ign.com game page purely via the search API
+    // (NS.searchAndResolveTitle, in 07-ign-api.js) - no local slug-guessing.
+    function resolveGameByTitle(title, callback) {
+        NS.searchAndResolveTitle(title, result => callback(result));
+    }
     function tryDualGameSplit(gameTitle, callback) {
         const plusIndex = gameTitle.indexOf("+");
         if (plusIndex === -1) return callback(false);
@@ -33,8 +38,6 @@
         const rightPart = gameTitle.slice(plusIndex + 1).replace(/\(\s*dlc\s*\)/gi, "").trim();
         if (!leftPart || !rightPart) return callback(false);
         const mergedTitle = `${leftPart} ${rightPart}`.replace(/\s+/g, " ").trim();
-        const leftUrls = NS.buildCandidateSlugs(leftPart).map(slug => `https://www.ign.com/games/${slug}`);
-        const mergedUrls = NS.buildCandidateSlugs(mergedTitle).map(slug => `https://www.ign.com/games/${slug}`);
         let leftResult, mergedResult, leftDone = false, mergedDone = false;
         function maybeFinish() {
             if (!leftDone || !mergedDone) return;
@@ -45,18 +48,8 @@
                 callback(true);
             } else callback(false);
         }
-        NS.resolveFirstWorkingUrl(leftUrls, r => { leftResult = r; leftDone = true; maybeFinish(); });
-        NS.resolveFirstWorkingUrl(mergedUrls, r => { mergedResult = r; mergedDone = true; maybeFinish(); });
-    }
-    function resolveGameByTitle(title, callback) {
-        const urlsToTry = NS.buildCandidateSlugs(title).map(slug => `https://www.ign.com/games/${slug}`);
-        NS.resolveFirstWorkingUrl(urlsToTry, result => {
-            if (result) return callback(result);
-            NS.fetchIgnSearch(title, searchHit => {
-                if (!searchHit) return callback(null);
-                NS.resolveFirstWorkingUrl([searchHit.url], searchResult => callback(searchResult));
-            });
-        });
+        resolveGameByTitle(leftPart, r => { leftResult = r; leftDone = true; maybeFinish(); });
+        resolveGameByTitle(mergedTitle, r => { mergedResult = r; mergedDone = true; maybeFinish(); });
     }
     function fetchPackageItems(names, originalTitle, dedicatedEntry) {
         const results = new Array(names.length).fill(null);
@@ -105,30 +98,47 @@
         else if (overrideUrl) NS.fetchHltbOverride(overrideUrl, r => finishRender(r.hltbData, r.hltbUrl));
         else finishRender(p.hltbData, p.hltbUrl);
     }
+    // Generic IGN site-search link, used only as the "couldn't find it" fallback
+    // link so an empty-state badge still points somewhere useful. Deliberately
+    // NOT pre-encoded here: every url that reaches the badge renderer
+    // (05-badge-render.js) gets exactly one encodeURI() applied when it's
+    // written into an href - pre-encoding here too would double-encode (e.g.
+    // a space becomes %20, then that %25 20 on the second pass).
+    function ignSearchFallbackUrl(title) {
+        return `https://www.ign.com/search?q=${title.trim()}`;
+    }
     function fetchSingleGame(gameTitle, isFallback, onExhausted) {
-        const urlsToTry = NS.buildCandidateSlugs(gameTitle).map(slug => `https://www.ign.com/games/${slug}`);
         const userOverride = NS.getUserOverrideForTitle(gameTitle);
-        if (userOverride && userOverride.ignUrl) urlsToTry.unshift(userOverride.ignUrl);
         function finalFallback() {
             if (/collection/i.test(gameTitle)) {
                 const packageNames = NS.extractPackageItemNames();
                 if (packageNames.length >= 2) return fetchPackageItems(packageNames, gameTitle, null);
             }
             if (onExhausted) return onExhausted();
-            NS.renderEmpty("N/A", urlsToTry[0] || "https://www.ign.com", gameTitle);
+            NS.renderEmpty("N/A", ignSearchFallbackUrl(gameTitle), gameTitle);
             NS.state.isFetching = false;
         }
-        NS.resolveFirstWorkingUrl(urlsToTry, result => {
-            if (result) return renderResolvedGame(result, gameTitle, urlsToTry[0]);
-            if (!isFallback) {
-                const baseGameName = NS.extractDlcBaseGameName();
-                if (baseGameName && baseGameName.toLowerCase().trim() !== gameTitle.toLowerCase().trim()) return NS.fetchIGNData(baseGameName, { isFallback: true, onExhausted });
-            }
-            NS.fetchIgnSearch(gameTitle, searchHit => {
-                if (!searchHit) return finalFallback();
-                NS.resolveFirstWorkingUrl([searchHit.url], searchResult => { if (searchResult) return renderResolvedGame(searchResult, gameTitle, urlsToTry[0]); finalFallback(); });
+        function searchAndRender() {
+            resolveGameByTitle(gameTitle, result => {
+                if (result) return renderResolvedGame(result, gameTitle, ignSearchFallbackUrl(gameTitle));
+                if (!isFallback) {
+                    const baseGameName = NS.extractDlcBaseGameName();
+                    if (baseGameName && baseGameName.toLowerCase().trim() !== gameTitle.toLowerCase().trim()) return NS.fetchIGNData(baseGameName, { isFallback: true, onExhausted });
+                }
+                finalFallback();
             });
-        });
+        }
+        // A per-title override (explicit user-supplied IGN URL) is tried first,
+        // verbatim, before falling back to search - it's an intentional pin, not
+        // a guess, so it should win outright when present and reachable.
+        if (userOverride && userOverride.ignUrl) {
+            NS.resolveFirstWorkingUrl([userOverride.ignUrl], result => {
+                if (result) return renderResolvedGame(result, gameTitle, userOverride.ignUrl);
+                searchAndRender();
+            });
+        } else {
+            searchAndRender();
+        }
     }
     NS.fetchIGNData = function fetchIGNData(gameTitle, options = {}) {
         NS.state.isFetching = true;

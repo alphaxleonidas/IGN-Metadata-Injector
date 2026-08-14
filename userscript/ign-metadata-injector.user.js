@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IGN Metadata Injector
 // @namespace    http://tampermonkey.net/
-// @version      1.0.3
+// @version      1.0.4
 // @description  Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors.
 // @author       Leonidas
 // @match        https://*.steampowered.com/*
@@ -205,68 +205,26 @@ cs2:["counter-strike: global offensive"],
 "jurassic world evolution 3: rebirth expansion":["jurassic world evolution 3"],
 "conan exiles enhanced: isle of siptah":["conan exiles"],
 "ratchet & clank: rift apart":["ratchet and clank rift apart"],
-"brütal legend":["brutal legend","brtal-legend"],
-"brutal legend":["brtal-legend"],
+"brütal legend":["brutal legend"],
+"brutal legend":["brütal legend"],
 "guilty gear xrd rev 2":["guilty gear xrd revelator 2"],
-"guilty gear":["guilty-gear-1998"],
+"guilty gear":["guilty gear 1998"],
 "grand theft auto v":["grand theft auto 5","gta v","gta 5"],
-"nioh 2":["nioh 2"],
 "nioh 2 the complete edition":["nioh 2"],
 "ninja gaiden 3":["ninja gaiden iii"],
-"ninja gaiden 3: razor's edge":["ninja gaiden iii razors edge"],
-"ninja gaiden 3: razor's edge [ninja gaiden: master collection]":["ninja gaiden iii razors edge"]
-};NS.TITLE_ALIASES=TITLE_ALIASES
-;const slugify=str=>str.replace(/'/g,"").replace(/[^a-z0-9]/gi,"-").replace(/-+/g,"-").replace(/^-|-$/g,"").toLowerCase()
-;function createIgnSlugs(title){
-const noPeriods=title.replace(/\./g,"")
-;let cleaned=noPeriods.replace(/[™®©]/g,"").replace(/[’‘]/g,"'").replace(/[–—]/g,"-").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/ü/g,"u").replace(/Ü/g,"u").replace(/ä/g,"a").replace(/Ä/g,"a").replace(/ö/g,"o").replace(/Ö/g,"o").replace(/ß/g,"ss").replace(/[Σσς](\d)/g,"Sigma $1").replace(/[Σσς]/g,"Sigma").replace(/Δ/g,"delta").replace(/Ω/g,"omega")
-;cleaned=cleaned.replace(/\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|director's cut|anniversary)\s*(edition)?\b/gi,"").replace(/\s*[:|]\s*(rebirth|expansion|dlc|season pass|enhanced|isle of .*)\s*\w*/gi,"").replace(/[–—-]\s*$/g,"").trim()
-;const slug=slugify(cleaned),primarySlug=slug.replace(/&/g,"and"),secondarySlug=slug.replace(/&/g,""),noPrefix=cleaned.replace(/^[a-z0-9]{2,4}\s+/i,""),tertiarySlug=noPrefix!==cleaned&&noPrefix.length>0?slugify(noPrefix).replace(/&/g,"and"):null,aggressiveDropSlug=slugify(noPeriods.replace(/[^\x00-\x7F]/g,""))
-;return{primarySlug:primarySlug,secondarySlug:secondarySlug,
-tertiarySlug:tertiarySlug,
-aggressiveDropSlug:aggressiveDropSlug!==primarySlug?aggressiveDropSlug:null
-}}
-const slugsToList=s=>[s.primarySlug,s.secondarySlug,s.tertiarySlug,s.aggressiveDropSlug].filter(Boolean)
-;function toRoman(num){
-const table=[[50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]]
-;let n=num,result=""
-;for(const[value,numeral]of table)for(;n>=value;)result+=numeral,
-n-=value;return result}const ROMAN_LOOKUP={}
-;for(let n=1;n<=50;n++)ROMAN_LOOKUP[toRoman(n).toLowerCase()]=n
-;const arabicToRomanVariant=title=>title.replace(/\b(\d{1,2})\.5\b|\b(\d{1,2})\b/g,(match,decimalPart,intPart)=>{
-if(void 0!==decimalPart)return`${toRoman(parseInt(decimalPart,10))}.5`
-;const num=parseInt(intPart,10)
-;return num>=1&&num<=50?toRoman(num):match
-}),romanToArabicVariant=title=>title.replace(/\b[a-zA-Z]+\b/g,word=>{
-const key=word.toLowerCase()
-;return ROMAN_LOOKUP.hasOwnProperty(key)?String(ROMAN_LOOKUP[key]):word
-});function generateTitleVariants(title){
-const variants=new Set([title]),dashUnwrapped=title.replace(/\s-([^-]+)-\s*$/i," $1").trim()
-;dashUnwrapped!==title&&variants.add(dashUnwrapped)
-;for(const base of[...variants]){
-const noDlc=base.replace(/\(\s*dlc\s*\)/gi,"").replace(/\s+/g," ").trim()
-;noDlc!==base&&variants.add(noDlc)}
-for(const base of[...variants])base.includes("+")&&(variants.add(base.replace(/\s*\+\s*/g," and ").replace(/\s+/g," ").trim()),
-variants.add(base.replace(/\s*\+\s*/g," ").replace(/\s+/g," ").trim()))
-;for(const base of[...variants]){
-const romanVariant=arabicToRomanVariant(base),arabicVariant=romanToArabicVariant(base)
-;romanVariant!==base&&variants.add(romanVariant),
-arabicVariant!==base&&variants.add(arabicVariant)}
-return[...variants]}
-NS.stripCollectionBracket=function(title){
+"ninja gaiden 3: razor's edge":["ninja gaiden iii razor's edge"],
+"ninja gaiden 3: razor's edge [ninja gaiden: master collection]":["ninja gaiden iii razor's edge"]
+}
+;NS.TITLE_ALIASES=TITLE_ALIASES,NS.getTitleAliases=function(title){
+return TITLE_ALIASES[title.toLowerCase().trim()]||[]
+},NS.stripCollectionBracket=function(title){
 const match=title.match(/^(.*?)\s*\[[^\]]*collection[^\]]*\]\s*$/i)
 ;return match?match[1].trim():null
 },NS.sigmaLetterFallbackTitle=function(title){
 return/[Σσς]/.test(title)?title.replace(/[Σσς](\d)/g,"S$1").replace(/[Σσς]/g,"S"):null
-},NS.buildCandidateSlugs=function(gameTitle){let slugs=[]
-;for(const variant of generateTitleVariants(gameTitle))slugs=slugs.concat(slugsToList(createIgnSlugs(variant)))
-;const lowerTitle=gameTitle.toLowerCase().trim()
-;for(const alias of TITLE_ALIASES[lowerTitle]||[]){
-alias.includes(" ")||slugs.push(alias)
-;for(const aliasVariant of generateTitleVariants(alias))slugs=slugs.concat(slugsToList(createIgnSlugs(aliasVariant)))
-}return[...new Set(slugs)]}
-}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),
-function(NS){"use strict"
+}
+}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
+"use strict"
 ;const cleanSteamTitle=raw=>raw.replace(/^Save \d+% on /i,"").replace(/^Pre-purchase /i,"").replace(/ on Steam$/i,"").trim()
 ;function rowUnder(container,markerEl){
 if(!container||!markerEl)return null;let node=markerEl
@@ -703,43 +661,76 @@ const sel=overlay.querySelector(`#ign_${key}_location_${platform}`)
 e.target.closest&&e.target.closest(".ign_open_settings_gear")&&NS.openSettings()
 })
 }(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
-"use strict";NS.fetchIgnSearch=function(term,callback){
-const variables=JSON.stringify({term:term,count:20,
-objectType:"Game"}),extensions=JSON.stringify({
-persistedQuery:{version:1,
+"use strict"
+;const EDITION_NOISE_RE=/\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|director's cut|anniversary)\s*(edition)?\b/gi,STOPWORDS=new Set(["the","a","an","of","and","edition"]),ROMAN_TABLE=[[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]]
+;function toRoman(num){let n=num,result=""
+;for(const[value,numeral]of ROMAN_TABLE)for(;n>=value;)result+=numeral,
+n-=value;return result}const ROMAN_LOOKUP={}
+;for(let n=1;n<=50;n++)ROMAN_LOOKUP[toRoman(n)]=n
+;function significantTokens(name){return function(name){
+return tokens=function(name){
+return(str=name,str.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/ß/gi,"ss").replace(/[Σσς](\d)/g,"Sigma $1").replace(/[Σσς]/g,"Sigma").replace(/Δ/g,"Delta").replace(/δ/g,"delta").replace(/Ω/g,"Omega").replace(/ω/g,"omega")).toLowerCase().replace(/[®™©]/g,"").replace(/&/g," and ").replace(EDITION_NOISE_RE," ").replace(/[^a-z0-9]+/g," ").trim()
+;var str
+}(name).split(" ").filter(Boolean),tokens.map(t=>ROMAN_LOOKUP.hasOwnProperty(t)?String(ROMAN_LOOKUP[t]):t)
+;var tokens}(name).filter(t=>!STOPWORDS.has(t))}
+const IGN_GRAPHQL_HEADERS={
+"apollographql-client-name":"kraken",
+"apollographql-client-version":"v0.67.0",
+referer:"https://www.ign.com/reviews/games",
+accept:"application/json","apollo-require-preflight":"true"}
+;NS.searchAndResolveTitle=function(title,callback){
+const storeYear=function(){if(!NS.IS_STEAM)return null
+;const el=document.querySelector(".release_date .date"),match=(el?.textContent??"").match(/\b(19|20)\d{2}\b/)
+;return match?parseInt(match[0],10):null
+}(),terms=[title,...NS.getTitleAliases(title)]
+;!function tryTerm(index){
+if(index>=terms.length)return callback(null)
+;!function(term,storeYear,callback){
+!function(term,callback){const variables=JSON.stringify({
+term:term,count:20,objectType:"Game"
+}),extensions=JSON.stringify({persistedQuery:{version:1,
 sha256Hash:"e1c2e012a21b4a98aaa618ef1b43eb0cafe9136303274a34f5d9ea4f2446e884"
-}
-}),url=`https://mollusk.apis.ign.com/graphql?operationName=SearchObjectsByName&variables=${encodeURIComponent(variables)}&extensions=${encodeURIComponent(extensions)}`
-;NS.http.get(url,{onload:function(response){
-if(200!==response.status)return callback(null);try{
-const best=function(results,searchTerm){
-if(!results.length)return null
-;const titleWords=new Set(searchTerm.toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/).filter(w=>w.length>2))
-;let best=null,bestScore=-1/0
-;return results.forEach((r,index)=>{
-const words=new Set(r.text.toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/))
-;let overlap=0;titleWords.forEach(w=>{
-words.has(w)&&overlap++});const score=overlap-.01*index
-;score>bestScore&&(bestScore=score,best=r)}),best
-}(function(json){const results=[],seen=new Set
-;function addCandidate(slug,text){if(!slug)return
-;const cleanSlug=String(slug).replace(/^\/+|\/+$/g,"").replace(/^games\//,"").toLowerCase()
-;cleanSlug&&!seen.has(cleanSlug)&&(seen.add(cleanSlug),
-results.push({slug:cleanSlug,
-text:text||cleanSlug.replace(/-/g," ")}))}
-return function walk(node){
-if(results.length>30||!node||"object"!=typeof node)return
-;if(Array.isArray(node))return void node.forEach(walk)
-;const name="string"==typeof node.name?node.name:"string"==typeof node.title?node.title:""
-;if("string"==typeof node.slug&&node.slug&&addCandidate(node.slug,name),
-"string"==typeof node.url&&/\/games\//i.test(node.url)){
-const match=node.url.match(/\/games\/([a-z0-9-]+)/i)
-;match&&addCandidate(match[1],name)}
-Object.values(node).forEach(walk)}(json),results
-}(JSON.parse(response.responseText)),term);callback(best?{
-slug:best.slug,url:`https://www.ign.com/games/${best.slug}`
-}:null)}catch(e){callback(null)}},onerror:function(){
-callback(null)}})},NS.parseIgnPage=function(doc){
+}});!function(url,callback){
+"undefined"!=typeof GM_xmlhttpRequest?GM_xmlhttpRequest({
+method:"GET",url:url,headers:IGN_GRAPHQL_HEADERS,
+onload:callback,onerror:()=>callback(null)
+}):NS.http.get(url,{onload:callback,
+onerror:()=>callback(null)})
+}(`https://mollusk.apis.ign.com/graphql?operationName=SearchObjectsByName&variables=${encodeURIComponent(variables)}&extensions=${encodeURIComponent(extensions)}`,response=>{
+if(!response||200!==response.status)return callback(null)
+;try{
+const json=JSON.parse(response.responseText),objects=json?.data?.searchObjectsByName?.objects??[]
+;callback(Array.isArray(objects)?objects:[])}catch(e){
+callback(null)}})}(term,results=>{
+if(!results||0===results.length)return callback(null)
+;const targetTokens=significantTokens(term)
+;let best=null,bestScore=-1/0;if(results.forEach(obj=>{
+const name=function(obj){const names=obj?.metadata?.names
+;return names?(names.name||names.short||names.alt&&names.alt[0]||null)?.trim()??null:null
+}(obj);if(!name||!obj.slug)return
+;const score=function(targetTokens,candidateTokens,storeYear,candidateObj){
+if(0===targetTokens.length||0===candidateTokens.length)return-1
+;const targetSet=new Set(targetTokens),candidateSet=new Set(candidateTokens)
+;let overlap=0;targetSet.forEach(t=>{
+candidateSet.has(t)&&overlap++})
+;const recall=overlap/targetSet.size;if(recall<.75)return-1
+;const precision=overlap/candidateSet.size
+;let score=2*recall*precision/(recall+precision)
+;if(null!=storeYear){const ignYear=function(obj){
+const dates=(obj?.objectRegions??[]).flatMap(r=>r.releases??[]).map(r=>r.date).filter(d=>"string"==typeof d&&/^\d{4}-\d{2}-\d{2}$/.test(d)).sort()
+;return dates.length?parseInt(dates[0].slice(0,4),10):null
+}(candidateObj)
+;null!=ignYear&&(score+=ignYear===storeYear?.15:-.15)}
+return score
+}(targetTokens,significantTokens(name),storeYear,obj)
+;score>bestScore&&(bestScore=score,best=obj)
+}),!best||bestScore<.5)return callback(null);callback({
+slug:String(best.slug).toLowerCase(),
+url:`https://www.ign.com/games/${best.slug}`})})
+}(terms[index],storeYear,hit=>{
+if(!hit)return tryTerm(index+1)
+;NS.resolveFirstWorkingUrl([hit.url],result=>callback(result))
+})}(0)},NS.parseIgnPage=function(doc){
 let fetchedGameTitle=""
 ;const h1TitleEl=doc.querySelector('h1[data-cy="object-header-display-title"]')||doc.querySelector("h1.display-title")
 ;h1TitleEl&&h1TitleEl.textContent.trim()&&(fetchedGameTitle=h1TitleEl.textContent.trim())
@@ -899,19 +890,14 @@ const html=NS.buildLeisureRow(leisureData,resolvedHltbUrl)
 ;"inline"===leisureLoc?(NS.fillLeisurePlaceholder(html),
 NS.clearLeisureStandalones()):NS.placeLeisureAndFinalize(html,leisureLoc)
 }):NS.finalizeHltbStandalone()}
+function resolveGameByTitle(title,callback){
+NS.searchAndResolveTitle(title,result=>callback(result))}
 function fetchPackageItems(names,originalTitle,dedicatedEntry){
 const results=new Array(names.length).fill(null)
 ;let remaining=names.length
 ;if(0===names.length)return dedicatedEntry?attachLeisureSection(NS.renderMultiGameBadge([dedicatedEntry],originalTitle)):NS.renderEmpty("N/A","https://www.ign.com",originalTitle),
 void(NS.state.isFetching=!1);names.forEach((name,index)=>{
-!function(title,callback){
-const urlsToTry=NS.buildCandidateSlugs(title).map(slug=>`https://www.ign.com/games/${slug}`)
-;NS.resolveFirstWorkingUrl(urlsToTry,result=>{
-if(result)return callback(result)
-;NS.fetchIgnSearch(title,searchHit=>{
-if(!searchHit)return callback(null)
-;NS.resolveFirstWorkingUrl([searchHit.url],searchResult=>callback(searchResult))
-})})}(name,result=>{
+resolveGameByTitle(name,result=>{
 if(results[index]=result?NS.gameEntryFromResult(result,name):null,
 0!==--remaining)return
 ;const found=results.filter(Boolean),deduped=dedicatedEntry?found.filter(g=>g.url!==dedicatedEntry.url):found,combined=dedicatedEntry?[dedicatedEntry,...deduped]:deduped
@@ -937,26 +923,26 @@ reviewSummaryText:p.reviewSummaryText,reviewUrl:p.reviewUrl
 ;NS.state.isFetching=!1,attachLeisureSection(resolvedHltbUrl)
 },lookupKey=gameTitle.toLowerCase().trim(),userOverride=NS.getUserOverrideForTitle(gameTitle),directHltbUrl=userOverride&&userOverride.hltbUrl||NS.HLTB_DIRECT_URL_OVERRIDES[lookupKey],overrideUrl=NS.HLTB_SOURCE_OVERRIDES[lookupKey]
 ;directHltbUrl?NS.fetchHltbDirect(directHltbUrl,r=>finishRender(r.hltbData,r.hltbUrl)):overrideUrl?NS.fetchHltbOverride(overrideUrl,r=>finishRender(r.hltbData,r.hltbUrl)):finishRender(p.hltbData,p.hltbUrl)
-}function fetchSingleGame(gameTitle,isFallback,onExhausted){
-const urlsToTry=NS.buildCandidateSlugs(gameTitle).map(slug=>`https://www.ign.com/games/${slug}`),userOverride=NS.getUserOverrideForTitle(gameTitle)
-;function finalFallback(){if(/collection/i.test(gameTitle)){
-const packageNames=NS.extractPackageItemNames()
-;if(packageNames.length>=2)return fetchPackageItems(packageNames,gameTitle,null)
-}if(onExhausted)return onExhausted()
-;NS.renderEmpty("N/A",urlsToTry[0]||"https://www.ign.com",gameTitle),
-NS.state.isFetching=!1}
-userOverride&&userOverride.ignUrl&&urlsToTry.unshift(userOverride.ignUrl),
-NS.resolveFirstWorkingUrl(urlsToTry,result=>{
-if(result)return renderResolvedGame(result,gameTitle,urlsToTry[0])
+}function ignSearchFallbackUrl(title){
+return`https://www.ign.com/search?q=${title.trim()}`}
+function fetchSingleGame(gameTitle,isFallback,onExhausted){
+const userOverride=NS.getUserOverrideForTitle(gameTitle)
+;function searchAndRender(){
+resolveGameByTitle(gameTitle,result=>{
+if(result)return renderResolvedGame(result,gameTitle,ignSearchFallbackUrl(gameTitle))
 ;if(!isFallback){
 const baseGameName=NS.extractDlcBaseGameName()
 ;if(baseGameName&&baseGameName.toLowerCase().trim()!==gameTitle.toLowerCase().trim())return NS.fetchIGNData(baseGameName,{
-isFallback:!0,onExhausted:onExhausted})}
-NS.fetchIgnSearch(gameTitle,searchHit=>{
-if(!searchHit)return finalFallback()
-;NS.resolveFirstWorkingUrl([searchHit.url],searchResult=>{
-if(searchResult)return renderResolvedGame(searchResult,gameTitle,urlsToTry[0])
-;finalFallback()})})})}
+isFallback:!0,onExhausted:onExhausted})}!function(){
+if(/collection/i.test(gameTitle)){
+const packageNames=NS.extractPackageItemNames()
+;if(packageNames.length>=2)return fetchPackageItems(packageNames,gameTitle,null)
+}if(onExhausted)return onExhausted()
+;NS.renderEmpty("N/A",ignSearchFallbackUrl(gameTitle),gameTitle),
+NS.state.isFetching=!1}()})}
+userOverride&&userOverride.ignUrl?NS.resolveFirstWorkingUrl([userOverride.ignUrl],result=>{
+if(result)return renderResolvedGame(result,gameTitle,userOverride.ignUrl)
+;searchAndRender()}):searchAndRender()}
 NS.fetchIGNData=function(gameTitle,options={}){
 NS.state.isFetching=!0
 ;const isFallback=!!options.isFallback,bundle=NS.BUNDLE_TITLE_OVERRIDES[gameTitle.toLowerCase().trim()]
@@ -979,16 +965,16 @@ const plusIndex=gameTitle.indexOf("+")
 ;if(-1===plusIndex)return callback(!1)
 ;const leftPart=gameTitle.slice(0,plusIndex).trim(),rightPart=gameTitle.slice(plusIndex+1).replace(/\(\s*dlc\s*\)/gi,"").trim()
 ;if(!leftPart||!rightPart)return callback(!1)
-;const mergedTitle=`${leftPart} ${rightPart}`.replace(/\s+/g," ").trim(),leftUrls=NS.buildCandidateSlugs(leftPart).map(slug=>`https://www.ign.com/games/${slug}`),mergedUrls=NS.buildCandidateSlugs(mergedTitle).map(slug=>`https://www.ign.com/games/${slug}`)
+;const mergedTitle=`${leftPart} ${rightPart}`.replace(/\s+/g," ").trim()
 ;let leftResult,mergedResult,leftDone=!1,mergedDone=!1
 ;function maybeFinish(){
 if(leftDone&&mergedDone)if(leftResult&&mergedResult&&leftResult.url!==mergedResult.url){
 const games=[NS.gameEntryFromResult(leftResult,leftPart),NS.gameEntryFromResult(mergedResult,mergedTitle)]
 ;attachLeisureSection(NS.renderMultiGameBadge(games,gameTitle)),
 NS.state.isFetching=!1,callback(!0)}else callback(!1)}
-NS.resolveFirstWorkingUrl(leftUrls,r=>{
+resolveGameByTitle(leftPart,r=>{
 leftResult=r,leftDone=!0,maybeFinish()
-}),NS.resolveFirstWorkingUrl(mergedUrls,r=>{
+}),resolveGameByTitle(mergedTitle,r=>{
 mergedResult=r,mergedDone=!0,maybeFinish()})
 }(gameTitle,handled=>{
 handled||fetchSingleGame(gameTitle,isFallback,options.onExhausted)

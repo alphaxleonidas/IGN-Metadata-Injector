@@ -1,58 +1,216 @@
 (function (NS) {
     "use strict";
+    // ============================================================================
+    // IGN search + matching. This replaces the old "guess a slug from the title,
+    // probe it with HTTP requests" approach entirely: every game is found via
+    // IGN's own persisted-query search API, then the best result is picked with
+    // a recall-gated similarity score instead of a loose word-overlap heuristic.
+    // Everything below fetchIgnSearchScored()/searchAndResolveTitle() down to
+    // parseIgnPage()/resolveFirstWorkingUrl()/gameEntryFromResult() is the
+    // "how do we read an ign.com page once we're on it" logic and is unchanged
+    // from the original script.
+    // ============================================================================
+
     const IGN_SEARCH_PERSISTED_HASH = "e1c2e012a21b4a98aaa618ef1b43eb0cafe9136303274a34f5d9ea4f2446e884";
-    function extractGameResultsFromGraphQL(json) {
-        const results = [], seen = new Set();
-        function addCandidate(slug, text) {
-            if (!slug) return;
-            const cleanSlug = String(slug).replace(/^\/+|\/+$/g, "").replace(/^games\//, "").toLowerCase();
-            if (!cleanSlug || seen.has(cleanSlug)) return;
-            seen.add(cleanSlug);
-            results.push({ slug: cleanSlug, text: text || cleanSlug.replace(/-/g, " ") });
-        }
-        function walk(node) {
-            if (results.length > 30 || !node || typeof node !== "object") return;
-            if (Array.isArray(node)) { node.forEach(walk); return; }
-            const name = typeof node.name === "string" ? node.name : typeof node.title === "string" ? node.title : "";
-            if (typeof node.slug === "string" && node.slug) addCandidate(node.slug, name);
-            if (typeof node.url === "string" && /\/games\//i.test(node.url)) {
-                const match = node.url.match(/\/games\/([a-z0-9-]+)/i);
-                if (match) addCandidate(match[1], name);
-            }
-            Object.values(node).forEach(walk);
-        }
-        walk(json);
-        return results;
+
+    // ---- text normalization for matching (never used for displayed text) ----
+
+    // Edition/version qualifiers add noise that dilutes comparison without
+    // helping distinguish one game from another.
+    const EDITION_NOISE_RE =
+        /\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|director's cut|anniversary)\s*(edition)?\b/gi;
+
+    // Words too generic to count as evidence of a match either way.
+    const STOPWORDS = new Set(["the", "a", "an", "of", "and", "edition"]);
+
+    const ROMAN_TABLE = [[50, "l"], [40, "xl"], [10, "x"], [9, "ix"], [5, "v"], [4, "iv"], [1, "i"]];
+    function toRoman(num) {
+        let n = num, result = "";
+        for (const [value, numeral] of ROMAN_TABLE) { while (n >= value) { result += numeral; n -= value; } }
+        return result;
     }
-    function pickBestSearchResult(results, searchTerm) {
-        if (!results.length) return null;
-        const titleWords = new Set(searchTerm.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2));
-        let best = null, bestScore = -Infinity;
-        results.forEach((r, index) => {
-            const words = new Set(r.text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/));
-            let overlap = 0;
-            titleWords.forEach(w => { if (words.has(w)) overlap++; });
-            const score = overlap - index * 0.01;
-            if (score > bestScore) { bestScore = score; best = r; }
-        });
-        return best;
+    const ROMAN_LOOKUP = {}; // 'iii' -> 3, etc.
+    for (let n = 1; n <= 50; n++) ROMAN_LOOKUP[toRoman(n)] = n;
+
+    // Rewrites roman numerals to arabic digits so "Ninja Gaiden III" and
+    // "Ninja Gaiden 3" tokenize identically instead of silently mismatching.
+    function normalizeNumerals(tokens) {
+        return tokens.map(t => ROMAN_LOOKUP.hasOwnProperty(t) ? String(ROMAN_LOOKUP[t]) : t);
     }
-    NS.fetchIgnSearch = function fetchIgnSearch(term, callback) {
-        const variables = JSON.stringify({ term: term, count: 20, objectType: "Game" });
+
+    // Transliterate accented/non-Latin characters to plain ASCII equivalents
+    // *before* the ASCII-only strip in normalize(), so e.g. "Pokémon" or a
+    // stylized "Ninja Gaiden Σ2" don't lose whole words to a single stray
+    // character. NFD + diacritic-strip handles most accented Latin generically;
+    // the explicit replacements below cover cases NFD doesn't decompose (German
+    // ß has no base+combining-mark form) or non-Latin letters that sometimes
+    // appear stylistically in game titles (Greek Σ/Δ/Ω).
+    // NOTE: this is used ONLY for internal matching. Anything shown in the
+    // badge (title, description, genres, etc.) must always come from the raw,
+    // un-transliterated API/page data - see parseIgnPage() below, which never
+    // calls this.
+    function transliterate(str) {
+        return str
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/ß/gi, "ss")
+            .replace(/[Σσς](\d)/g, "Sigma $1")
+            .replace(/[Σσς]/g, "Sigma")
+            .replace(/Δ/g, "Delta").replace(/δ/g, "delta")
+            .replace(/Ω/g, "Omega").replace(/ω/g, "omega");
+    }
+
+    function normalize(name) {
+        return transliterate(name)
+            .toLowerCase()
+            .replace(/[®™©]/g, "")
+            .replace(/&/g, " and ") // "Ratchet & Clank" <-> "Ratchet and Clank"
+            .replace(EDITION_NOISE_RE, " ")
+            .replace(/[^a-z0-9]+/g, " ")
+            .trim();
+    }
+    function tokenize(name) {
+        return normalizeNumerals(normalize(name).split(" ").filter(Boolean));
+    }
+    // Significant tokens only: drops stopwords, since matching on "the"/"and"
+    // tells us nothing about whether two titles are the same game.
+    function significantTokens(name) {
+        return tokenize(name).filter(t => !STOPWORDS.has(t));
+    }
+
+    // ---- name/year extraction from IGN's actual GraphQL schema ----
+    // (metadata.names.name, not a flat "name" field; objectRegions[].releases[].date
+    // as "yyyy-MM-dd" strings, not a flat release-year field.)
+    function getGameName(obj) {
+        const names = obj?.metadata?.names;
+        if (!names) return null;
+        return (names.name || names.short || (names.alt && names.alt[0]) || null)?.trim() ?? null;
+    }
+    function getIgnReleaseYear(obj) {
+        const dates = (obj?.objectRegions ?? [])
+            .flatMap(r => r.releases ?? [])
+            .map(r => r.date)
+            .filter(d => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d))
+            .sort();
+        return dates.length ? parseInt(dates[0].slice(0, 4), 10) : null;
+    }
+
+    // Steam's release date block usually reads "22 Jul, 2021" or similar -
+    // just grab the 4-digit year, if present, as a secondary disambiguator.
+    function getStoreReleaseYear() {
+        if (!NS.IS_STEAM) return null;
+        const el = document.querySelector(".release_date .date");
+        const text = el?.textContent ?? "";
+        const match = text.match(/\b(19|20)\d{2}\b/);
+        return match ? parseInt(match[0], 10) : null;
+    }
+
+    // ---- recall-gated similarity scoring ----
+    // A candidate is only eligible if nearly all of the *significant* words in
+    // the store title actually appear in it - not just "shares some words".
+    // This is what stops e.g. the base franchise entry "Ratchet and Clank"
+    // from beating "Ratchet and Clank: Rift Apart": it's missing "rift" and
+    // "apart" entirely, so it's disqualified rather than merely down-scored.
+    const MIN_RECALL = 0.75; // allow at most ~1 missing significant word on longer titles
+    const MIN_MATCH_SCORE = 0.5; // final F1-style score floor, post-recall-gate
+    const YEAR_MATCH_BONUS = 0.15;
+    const YEAR_MISMATCH_PENALTY = 0.15;
+
+    function scoreCandidate(targetTokens, candidateTokens, storeYear, candidateObj) {
+        if (targetTokens.length === 0 || candidateTokens.length === 0) return -1;
+        const targetSet = new Set(targetTokens);
+        const candidateSet = new Set(candidateTokens);
+        let overlap = 0;
+        targetSet.forEach(t => { if (candidateSet.has(t)) overlap++; });
+
+        const recall = overlap / targetSet.size;
+        if (recall < MIN_RECALL) return -1; // hard gate: disqualify, don't just penalize
+
+        const precision = overlap / candidateSet.size;
+        let score = (2 * recall * precision) / (recall + precision); // F1
+
+        if (storeYear != null) {
+            const ignYear = getIgnReleaseYear(candidateObj);
+            if (ignYear != null) score += ignYear === storeYear ? YEAR_MATCH_BONUS : -YEAR_MISMATCH_PENALTY;
+        }
+        return score;
+    }
+
+    // ---- raw GraphQL search call ----
+    // NS.http.get (00-namespace.js) never sends custom headers - fine for
+    // plain page fetches, but IGN's GraphQL endpoint runs Apollo Server's
+    // CSRF prevention, which rejects any request that doesn't carry either a
+    // non-simple content-type or the apollo-require-preflight header. This
+    // talks to GM_xmlhttpRequest directly (still exempt from CORS, same as
+    // NS.http.get is) so those headers can actually be set; it falls back to
+    // NS.http.get - without the special headers - only in the rare case
+    // GM_xmlhttpRequest itself isn't available (e.g. a future runtime), where
+    // the search call may still be rejected by IGN's CSRF check.
+    const IGN_GRAPHQL_HEADERS = {
+        "apollographql-client-name": "kraken",
+        "apollographql-client-version": "v0.67.0",
+        referer: "https://www.ign.com/reviews/games",
+        accept: "application/json",
+        "apollo-require-preflight": "true",
+    };
+    function ignGraphqlGet(url, callback) {
+        if (typeof GM_xmlhttpRequest !== "undefined") {
+            GM_xmlhttpRequest({ method: "GET", url, headers: IGN_GRAPHQL_HEADERS, onload: callback, onerror: () => callback(null) });
+        } else {
+            NS.http.get(url, { onload: callback, onerror: () => callback(null) });
+        }
+    }
+    function rawIgnSearch(term, callback) {
+        const variables = JSON.stringify({ term, count: 20, objectType: "Game" });
         const extensions = JSON.stringify({ persistedQuery: { version: 1, sha256Hash: IGN_SEARCH_PERSISTED_HASH } });
         const url = `https://mollusk.apis.ign.com/graphql?operationName=SearchObjectsByName&variables=${encodeURIComponent(variables)}&extensions=${encodeURIComponent(extensions)}`;
-        NS.http.get(url, {
-            onload: function (response) {
-                if (response.status !== 200) return callback(null);
-                try {
-                    const results = extractGameResultsFromGraphQL(JSON.parse(response.responseText));
-                    const best = pickBestSearchResult(results, term);
-                    callback(best ? { slug: best.slug, url: `https://www.ign.com/games/${best.slug}` } : null);
-                } catch (e) { callback(null); }
-            },
-            onerror: function () { callback(null); }
+        ignGraphqlGet(url, response => {
+            if (!response || response.status !== 200) return callback(null);
+            try {
+                const json = JSON.parse(response.responseText);
+                const objects = json?.data?.searchObjectsByName?.objects ?? [];
+                callback(Array.isArray(objects) ? objects : []);
+            } catch (e) { callback(null); }
         });
+    }
+
+    // Scored search: runs the search term, scores every candidate against it,
+    // and returns the best one IF it clears the confidence floor - otherwise
+    // null, so callers can try another term (alias) instead of guessing wrong.
+    function fetchIgnSearchScored(term, storeYear, callback) {
+        rawIgnSearch(term, results => {
+            if (!results || results.length === 0) return callback(null);
+            const targetTokens = significantTokens(term);
+            let best = null, bestScore = -Infinity;
+            results.forEach(obj => {
+                const name = getGameName(obj);
+                if (!name || !obj.slug) return;
+                const score = scoreCandidate(targetTokens, significantTokens(name), storeYear, obj);
+                if (score > bestScore) { bestScore = score; best = obj; }
+            });
+            if (!best || bestScore < MIN_MATCH_SCORE) return callback(null);
+            callback({ slug: String(best.slug).toLowerCase(), url: `https://www.ign.com/games/${best.slug}` });
+        });
+    }
+
+    // Public entry point used by the fetch orchestrator: tries the store title
+    // first, then each configured alias (03-title-resolver.js) in order, until
+    // one produces a confident match. Returns {url, parsed} (same shape as
+    // resolveFirstWorkingUrl) or null via callback if nothing was confident.
+    NS.searchAndResolveTitle = function searchAndResolveTitle(title, callback) {
+        const storeYear = getStoreReleaseYear();
+        const terms = [title, ...NS.getTitleAliases(title)];
+        function tryTerm(index) {
+            if (index >= terms.length) return callback(null);
+            fetchIgnSearchScored(terms[index], storeYear, hit => {
+                if (!hit) return tryTerm(index + 1);
+                NS.resolveFirstWorkingUrl([hit.url], result => callback(result));
+            });
+        }
+        tryTerm(0);
     };
+
+    // ---- reading an ign.com game page once we're on it (unchanged) ----
     NS.parseIgnPage = function parseIgnPage(doc) {
         let fetchedGameTitle = "";
         const h1TitleEl = doc.querySelector('h1[data-cy="object-header-display-title"]') || doc.querySelector("h1.display-title");
