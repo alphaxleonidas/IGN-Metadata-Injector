@@ -1,3 +1,10 @@
+# **<< SLUG BRANCH >>**
+- LAST VERSION THAT USES SLUG LOGIC
+- NEWER VERSIONS USE A DIFFERENT LOGIC
+- THIS BRANCH IS KEPT AS A BACKUP
+
+# << README >>
+  
 # IGN Metadata Injector
 
 Injects IGN data inside Steam and Epic's game page.
