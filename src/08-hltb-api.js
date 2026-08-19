@@ -5,7 +5,8 @@
         "ninja gaiden 3: razor's edge": "https://howlongtobeat.com/game/6623",
         "ninja gaiden 3: razor's edge [ninja gaiden: master collection]": "https://howlongtobeat.com/game/6623",
         "kingdom hearts -hd 1.5+2.5 remix-": "https://howlongtobeat.com/game/42802",
-        "schrodinger's cat burglar": "https://howlongtobeat.com/game/184497"
+        "schrodinger's cat burglar": "https://howlongtobeat.com/game/184497",
+        "gothic 1 remake": "https://howlongtobeat.com/game/92900"
     };
     NS.fetchHltbOverride = function fetchHltbOverride(url, callback) {
         const empty = () => callback({ hltbData: [], hltbUrl: "" });

@@ -128,12 +128,15 @@
                 finalFallback();
             });
         }
-        // A per-title override (explicit user-supplied IGN URL) is tried first,
-        // verbatim, before falling back to search - it's an intentional pin, not
-        // a guess, so it should win outright when present and reachable.
-        if (userOverride && userOverride.ignUrl) {
-            NS.resolveFirstWorkingUrl([userOverride.ignUrl], result => {
-                if (result) return renderResolvedGame(result, gameTitle, userOverride.ignUrl);
+        // A per-title override wins outright when present and reachable - it's
+        // an intentional pin, not a guess, so it's tried before search. The
+        // user's own runtime override (set in the settings panel) takes
+        // priority over the built-in IGN_URL_OVERRIDES default for the same
+        // title, in case they ever want to pin something different.
+        const pinnedIgnUrl = (userOverride && userOverride.ignUrl) || NS.IGN_URL_OVERRIDES[gameTitle.toLowerCase().trim()];
+        if (pinnedIgnUrl) {
+            NS.resolveFirstWorkingUrl([pinnedIgnUrl], result => {
+                if (result) return renderResolvedGame(result, gameTitle, pinnedIgnUrl);
                 searchAndRender();
             });
         } else {

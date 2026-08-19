@@ -26,6 +26,15 @@
         "ninja gaiden 3: razor's edge [ninja gaiden: master collection]": ["ninja gaiden iii razor's edge"]
     };
     NS.TITLE_ALIASES = TITLE_ALIASES;
+    // Direct IGN URL pins for titles where a search-based match either isn't
+    // confident enough or resolves to the wrong page (e.g. IGN's own slug
+    // doesn't reflect the store title's numbering). Checked before search -
+    // same idea as the runtime per-title overrides in the settings panel,
+    // just baked in as sensible defaults rather than something the user has
+    // to add themselves.
+    NS.IGN_URL_OVERRIDES = {
+        "gothic 1 remake": "https://www.ign.com/games/gothic-remake"
+    };
     // Additional search terms to try (in order) for a given store title, on
     // top of the title itself. Empty array if none defined.
     NS.getTitleAliases = function getTitleAliases(title) {

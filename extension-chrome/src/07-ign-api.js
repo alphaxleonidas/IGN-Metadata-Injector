@@ -157,7 +157,12 @@
         if (typeof GM_xmlhttpRequest !== "undefined") {
             GM_xmlhttpRequest({ method: "GET", url, headers: IGN_GRAPHQL_HEADERS, onload: callback, onerror: () => callback(null) });
         } else {
-            NS.http.get(url, { onload: callback, onerror: () => callback(null) });
+            // Extension context: NS.http.get's third argument forwards these
+            // headers through the background script's fetch() (00-namespace.js /
+            // 11-background.js) - same CSRF requirement as the Tampermonkey path
+            // above, just routed differently since GM_xmlhttpRequest isn't
+            // available here.
+            NS.http.get(url, { onload: callback, onerror: () => callback(null) }, IGN_GRAPHQL_HEADERS);
         }
     }
     function rawIgnSearch(term, callback) {

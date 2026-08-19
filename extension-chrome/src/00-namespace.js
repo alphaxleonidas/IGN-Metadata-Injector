@@ -48,14 +48,14 @@
             set: (key, value) => { cache[key] = value; }
         };
     }
-    function rawFetch(url, handlers) {
-        fetch(url, { method: "GET", credentials: "omit" })
+    function rawFetch(url, handlers, headers) {
+        fetch(url, { method: "GET", credentials: "omit", headers: headers || undefined })
             .then(res => res.text().then(text => ({ status: res.status, responseText: text })))
             .then(response => { if (handlers.onload) handlers.onload(response); })
             .catch(() => { if (handlers.onerror) handlers.onerror(); });
     }
     if (typeof GM_xmlhttpRequest !== "undefined") {
-        NS.http = { get: (url, handlers) => GM_xmlhttpRequest({ method: "GET", url: url, onload: handlers.onload, onerror: handlers.onerror }) };
+        NS.http = { get: (url, handlers, headers) => GM_xmlhttpRequest({ method: "GET", url: url, headers: headers || undefined, onload: handlers.onload, onerror: handlers.onerror }) };
     } else if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
         // Extension context (content script or the options page): proxy cross-origin
         // fetches through the background script instead of calling fetch() here directly.
@@ -65,9 +65,12 @@
         // redirect either) — so results can differ by which site injected the script,
         // exactly the kind of "works on Epic, N/A on Steam" split this fixes. The
         // background script isn't attached to any page, so it always behaves the same.
+        // Optional headers are forwarded through the message to 11-background.js's
+        // fetch() call - needed for endpoints like IGN's GraphQL API that reject
+        // requests missing specific headers (see 07-ign-api.js).
         NS.http = {
-            get: (url, handlers) => {
-                chrome.runtime.sendMessage({ type: "ignFetch", url }, response => {
+            get: (url, handlers, headers) => {
+                chrome.runtime.sendMessage({ type: "ignFetch", url, headers: headers || undefined }, response => {
                     if (chrome.runtime.lastError || !response || !response.ok) { if (handlers.onerror) handlers.onerror(); return; }
                     if (handlers.onload) handlers.onload({ status: response.status, responseText: response.responseText });
                 });

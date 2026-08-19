@@ -17,7 +17,7 @@ chrome.action.onClicked.addListener(() => {
 // MV3-service-worker requirement as above.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || message.type !== "ignFetch" || typeof message.url !== "string") return false;
-    fetch(message.url, { method: "GET", credentials: "omit" })
+    fetch(message.url, { method: "GET", credentials: "omit", headers: message.headers || undefined })
         .then(res => res.text().then(text => sendResponse({ ok: true, status: res.status, responseText: text })))
         .catch(() => sendResponse({ ok: false }));
     return true; // keep the message channel open for the async sendResponse above

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IGN Metadata Injector
 // @namespace    http://tampermonkey.net/
-// @version      1.0.4
+// @version      1.0.5
 // @description  Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors.
 // @author       Leonidas
 // @match        https://*.steampowered.com/*
@@ -55,17 +55,19 @@ cache[key]=value,chrome.storage.local.set({[key]:value})}}
 getSync:(key,defaultValue)=>cache.hasOwnProperty(key)?cache[key]:defaultValue,
 set:(key,value)=>{cache[key]=value}}}
 "undefined"!=typeof GM_xmlhttpRequest?NS.http={
-get:(url,handlers)=>GM_xmlhttpRequest({method:"GET",url:url,
-onload:handlers.onload,onerror:handlers.onerror})
+get:(url,handlers,headers)=>GM_xmlhttpRequest({method:"GET",
+url:url,headers:headers||void 0,onload:handlers.onload,
+onerror:handlers.onerror})
 }:"undefined"!=typeof chrome&&chrome.runtime&&chrome.runtime.sendMessage?NS.http={
-get:(url,handlers)=>{chrome.runtime.sendMessage({
-type:"ignFetch",url:url},response=>{
+get:(url,handlers,headers)=>{chrome.runtime.sendMessage({
+type:"ignFetch",url:url,headers:headers||void 0},response=>{
 !chrome.runtime.lastError&&response&&response.ok?handlers.onload&&handlers.onload({
 status:response.status,responseText:response.responseText
 }):handlers.onerror&&handlers.onerror()})}}:NS.http={
-get:function(url,handlers){fetch(url,{method:"GET",
-credentials:"omit"}).then(res=>res.text().then(text=>({
-status:res.status,responseText:text}))).then(response=>{
+get:function(url,handlers,headers){fetch(url,{method:"GET",
+credentials:"omit",headers:headers||void 0
+}).then(res=>res.text().then(text=>({status:res.status,
+responseText:text}))).then(response=>{
 handlers.onload&&handlers.onload(response)}).catch(()=>{
 handlers.onerror&&handlers.onerror()})}}
 }(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),
@@ -214,8 +216,9 @@ cs2:["counter-strike: global offensive"],
 "ninja gaiden 3":["ninja gaiden iii"],
 "ninja gaiden 3: razor's edge":["ninja gaiden iii razor's edge"],
 "ninja gaiden 3: razor's edge [ninja gaiden: master collection]":["ninja gaiden iii razor's edge"]
-}
-;NS.TITLE_ALIASES=TITLE_ALIASES,NS.getTitleAliases=function(title){
+};NS.TITLE_ALIASES=TITLE_ALIASES,NS.IGN_URL_OVERRIDES={
+"gothic 1 remake":"https://www.ign.com/games/gothic-remake"
+},NS.getTitleAliases=function(title){
 return TITLE_ALIASES[title.toLowerCase().trim()]||[]
 },NS.stripCollectionBracket=function(title){
 const match=title.match(/^(.*?)\s*\[[^\]]*collection[^\]]*\]\s*$/i)
@@ -695,7 +698,7 @@ sha256Hash:"e1c2e012a21b4a98aaa618ef1b43eb0cafe9136303274a34f5d9ea4f2446e884"
 method:"GET",url:url,headers:IGN_GRAPHQL_HEADERS,
 onload:callback,onerror:()=>callback(null)
 }):NS.http.get(url,{onload:callback,
-onerror:()=>callback(null)})
+onerror:()=>callback(null)},IGN_GRAPHQL_HEADERS)
 }(`https://mollusk.apis.ign.com/graphql?operationName=SearchObjectsByName&variables=${encodeURIComponent(variables)}&extensions=${encodeURIComponent(extensions)}`,response=>{
 if(!response||200!==response.status)return callback(null)
 ;try{
@@ -860,7 +863,8 @@ NS.HLTB_SOURCE_OVERRIDES={
 "ninja gaiden 3: razor's edge":"https://howlongtobeat.com/game/6623",
 "ninja gaiden 3: razor's edge [ninja gaiden: master collection]":"https://howlongtobeat.com/game/6623",
 "kingdom hearts -hd 1.5+2.5 remix-":"https://howlongtobeat.com/game/42802",
-"schrodinger's cat burglar":"https://howlongtobeat.com/game/184497"
+"schrodinger's cat burglar":"https://howlongtobeat.com/game/184497",
+"gothic 1 remake":"https://howlongtobeat.com/game/92900"
 },NS.fetchHltbOverride=function(url,callback){
 const empty=()=>callback({hltbData:[],hltbUrl:""})
 ;NS.http.get(url,{onload:function(response){
@@ -940,8 +944,9 @@ const packageNames=NS.extractPackageItemNames()
 }if(onExhausted)return onExhausted()
 ;NS.renderEmpty("N/A",ignSearchFallbackUrl(gameTitle),gameTitle),
 NS.state.isFetching=!1}()})}
-userOverride&&userOverride.ignUrl?NS.resolveFirstWorkingUrl([userOverride.ignUrl],result=>{
-if(result)return renderResolvedGame(result,gameTitle,userOverride.ignUrl)
+const pinnedIgnUrl=userOverride&&userOverride.ignUrl||NS.IGN_URL_OVERRIDES[gameTitle.toLowerCase().trim()]
+;pinnedIgnUrl?NS.resolveFirstWorkingUrl([pinnedIgnUrl],result=>{
+if(result)return renderResolvedGame(result,gameTitle,pinnedIgnUrl)
 ;searchAndRender()}):searchAndRender()}
 NS.fetchIGNData=function(gameTitle,options={}){
 NS.state.isFetching=!0
