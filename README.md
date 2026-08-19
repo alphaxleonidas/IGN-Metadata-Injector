@@ -7,7 +7,7 @@
   
 # IGN Metadata Injector
 
-Injects IGN data inside Steam and Epic's game page.
+Injects IGN data into Steam and Epic's game page.
 
 ## Features: 
 - IGN score and user rating
