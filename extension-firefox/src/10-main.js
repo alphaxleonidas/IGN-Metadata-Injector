@@ -10,7 +10,15 @@
     }
     NS.init = function init() {
         const title = NS.getGameTitle();
-        if (!title) return;
+        if (!title) {
+            // Not a game page (or navigated away from one via client-side
+            // routing, e.g. Epic's SPA storefront) - clear any leftover UI
+            // from a previous page rather than leaving it stranded.
+            document.querySelector(".ign_rating_row")?.remove();
+            document.querySelector(".ign_settings_gear_standalone")?.remove();
+            NS.state.lastProcessedTitle = "";
+            return;
+        }
         NS.renderSettingsGearStandalone();
         if (!NS.isEnabledForCurrentSite()) return;
         if (title !== NS.state.lastProcessedTitle) {

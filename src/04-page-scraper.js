@@ -5,6 +5,17 @@
     // Demo") but should still resolve to the full game's IGN/HLTB data, so "Demo" is stripped from
     // whatever title gets used for matching/display.
     const stripDemoSuffix = title => title.replace(/[\s:-]*\bdemo\b\s*$/i, "").trim();
+    // Epic's storefront is a single-domain SPA - the homepage, /browse listing,
+    // /news, /wishlist, /library, /achievements, etc. all share the same
+    // origin as an actual game page and can still contain some <h1> (e.g. a
+    // hero banner or section heading), which would otherwise get misread as a
+    // game title. Real product/DLC pages and bundle pages are the only ones
+    // that live under a /p/<slug> or /bundles/<slug> path (locale prefix
+    // optional, e.g. /en-US/p/hades) - everything else is treated as "not a
+    // game page" regardless of what's in the DOM.
+    function isEpicProductPage() {
+        return /\/(p|bundles)\/[^/?#]+/i.test(window.location.pathname);
+    }
     NS.getGameTitle = function getGameTitle() {
         let title = null;
         if (NS.IS_STEAM) {
@@ -16,7 +27,7 @@
             }
             if (!title && document.title) { const t = cleanSteamTitle(document.title); if (t && t !== "Steam") title = t; }
         }
-        if (!title && NS.IS_EPIC) {
+        if (!title && NS.IS_EPIC && isEpicProductPage()) {
             const h1El = document.querySelector("h1") || document.querySelector('[data-testid="pdp-title"]');
             if (h1El) title = h1El.textContent.trim();
         }

@@ -245,7 +245,8 @@ const ogTitle=document.querySelector('meta[property="og:title"]')
 const t=cleanSteamTitle(ogTitle.content.trim());t&&(title=t)
 }}if(!title&&document.title){
 const t=cleanSteamTitle(document.title)
-;t&&"Steam"!==t&&(title=t)}}if(!title&&NS.IS_EPIC){
+;t&&"Steam"!==t&&(title=t)}}
+if(!title&&NS.IS_EPIC&&/\/(p|bundles)\/[^/?#]+/i.test(window.location.pathname)){
 const h1El=document.querySelector("h1")||document.querySelector('[data-testid="pdp-title"]')
 ;h1El&&(title=h1El.textContent.trim())}
 return title?(title=>title.replace(/[\s:-]*\bdemo\b\s*$/i,"").trim())(title):null
@@ -864,7 +865,8 @@ NS.HLTB_SOURCE_OVERRIDES={
 "ninja gaiden 3: razor's edge [ninja gaiden: master collection]":"https://howlongtobeat.com/game/6623",
 "kingdom hearts -hd 1.5+2.5 remix-":"https://howlongtobeat.com/game/42802",
 "schrodinger's cat burglar":"https://howlongtobeat.com/game/184497",
-"gothic 1 remake":"https://howlongtobeat.com/game/92900"
+"gothic 1 remake":"https://howlongtobeat.com/game/92900",
+"the relic: first guardian":"https://howlongtobeat.com/game/151982"
 },NS.fetchHltbOverride=function(url,callback){
 const empty=()=>callback({hltbData:[],hltbUrl:""})
 ;NS.http.get(url,{onload:function(response){
@@ -987,9 +989,11 @@ handled||fetchSingleGame(gameTitle,isFallback,options.onExhausted)
 }
 }(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
 "use strict";NS.init=function(){
-const title=NS.getGameTitle();if(!title)return
-;if(NS.renderSettingsGearStandalone(),
-!NS.isEnabledForCurrentSite())return
+const title=NS.getGameTitle()
+;if(!title)return document.querySelector(".ign_rating_row")?.remove(),
+document.querySelector(".ign_settings_gear_standalone")?.remove(),
+void(NS.state.lastProcessedTitle="")
+;if(NS.renderSettingsGearStandalone(),!NS.isEnabledForCurrentSite())return
 ;if(title!==NS.state.lastProcessedTitle&&(NS.state.lastProcessedTitle=title,
 document.querySelector(".ign_rating_row")?.remove()),
 document.querySelector(".ign_rating_row")||NS.state.isFetching)return
