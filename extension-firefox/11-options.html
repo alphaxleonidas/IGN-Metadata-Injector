@@ -11,6 +11,21 @@
         <p class="sub">Settings apply immediately on save — no need to reload Steam/Epic tabs that are already open (they'll pick it up on next page change).</p>
 
         <section class="full">
+            <label class="toggle_row" style="border-bottom:none;">
+                <span>Use the same settings for Steam and Epic</span>
+                <span class="switch">
+                    <input type="checkbox" id="placement_shared">
+                    <span class="switch_slider"></span>
+                </span>
+            </label>
+            <div id="platform_pager" class="platform_pager" hidden>
+                <button type="button" id="pager_prev" class="pager_arrow" aria-label="Previous platform">‹</button>
+                <span id="pager_label" class="pager_label"></span>
+                <button type="button" id="pager_next" class="pager_arrow" aria-label="Next platform">›</button>
+            </div>
+        </section>
+
+        <section class="full">
             <div class="order_list_header"><span class="separate_col_label">Separate Entry</span><h2>Section Order (drag to reorder)</h2><span class="visible_col_label">Visible</span></div>
             <ul id="order_list"></ul>
             <label class="toggle_row" style="border-bottom:none;margin-top:4px;">
@@ -21,21 +36,18 @@
                 </span>
             </label>
             <div class="locations_row" id="combine_all_locations" style="margin-top:8px;display:none;"></div>
+            <label class="toggle_row" style="border-bottom:none;margin-top:4px;">
+                <span>Search HowLongToBeat link when no data found</span>
+                <span class="switch">
+                    <input type="checkbox" id="hltb_search_fallback">
+                    <span class="switch_slider"></span>
+                </span>
+            </label>
         </section>
 
         <section class="full">
             <h2>Enable / Disable Per Site</h2>
             <div id="enable_list"></div>
-        </section>
-
-        <section class="full">
-            <label class="toggle_row" style="border-bottom:none;">
-                <span>Share the same placement for Steam and Epic</span>
-                <span class="switch">
-                    <input type="checkbox" id="placement_shared">
-                    <span class="switch_slider"></span>
-                </span>
-            </label>
         </section>
 
         <section class="full">

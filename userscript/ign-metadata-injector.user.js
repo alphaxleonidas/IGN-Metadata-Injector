@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IGN Metadata Injector
 // @namespace    http://tampermonkey.net/
-// @version      1.0.5
+// @version      1.0.6
 // @description  Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors.
 // @author       Leonidas
 // @match        https://*.steampowered.com/*
@@ -84,18 +84,22 @@ showPublisher:"Show Publisher",showGenres:"Show Genres",
 showPlatforms:"Show Platforms",showFeatures:"Show Features",
 showDescription:"Show Game Description",
 showHltb:"Show HowLongToBeat",
-showLeisure:"Show HLTB Leisure Times"},CONFIG_DEFAULTS={
-showIgnScore:!0,showUserRating:!0,showReviewGrading:!0,
-showReview:!0,showSteamReviews:!0,showAward:!0,showEsrb:!0,
-showDeveloper:!1,showPublisher:!1,showGenres:!0,
-showPlatforms:!0,showFeatures:!1,showDescription:!0,
-showHltb:!0,showLeisure:!0}
-;NS.CONFIG_KEYS=CONFIG_KEYS,NS.CONFIG_DEFAULTS=CONFIG_DEFAULTS,
-NS.getConfig=key=>NS.storage.getSync(key,CONFIG_DEFAULTS[key])
-;const DEFAULT_SECTION_ORDER=["scores","reviewGrading","award","review","steamReviews","esrb","developer","publisher","genres","platforms","features","description","hltb","leisure"]
-;function currentPlatform(){
+showLeisure:"Show HLTB Leisure Times",
+showHltbSearchFallback:"Search HowLongToBeat Link When No Data Found"
+},CONFIG_DEFAULTS={showIgnScore:!0,showUserRating:!0,
+showReviewGrading:!0,showReview:!0,showSteamReviews:!0,
+showAward:!0,showEsrb:!0,showDeveloper:!1,showPublisher:!1,
+showGenres:!0,showPlatforms:!0,showFeatures:!1,
+showDescription:!0,showHltb:!0,showLeisure:!0,
+showHltbSearchFallback:!0};function currentPlatform(){
 return NS.IS_STEAM?"Steam":NS.IS_EPIC?"Epic":""}
-NS.SECTION_LABELS={scores:"IGN Score / User Rating",
+NS.CONFIG_KEYS=CONFIG_KEYS,NS.CONFIG_DEFAULTS=CONFIG_DEFAULTS,
+NS.PLATFORMS=["Steam","Epic"],
+NS.getConfigFor=(key,platform)=>NS.storage.getSync(key+platform,CONFIG_DEFAULTS[key]),
+NS.setConfigFor=(key,platform,value)=>NS.storage.set(key+platform,value),
+NS.getConfig=key=>NS.getConfigFor(key,currentPlatform())
+;const DEFAULT_SECTION_ORDER=["scores","reviewGrading","award","review","steamReviews","esrb","developer","publisher","genres","platforms","features","description","hltb","leisure"]
+;NS.SECTION_LABELS={scores:"IGN Score / User Rating",
 reviewGrading:"Review Grading",review:"Review Summary",
 steamReviews:"Steam Reviews",award:"Leaderboard Rank",
 esrb:"ESRB Rating",developer:"Developer",
@@ -111,12 +115,14 @@ publisher:["showPublisher"],genres:["showGenres"],
 platforms:["showPlatforms"],features:["showFeatures"],
 description:["showDescription"],hltb:["showHltb"],
 leisure:["showLeisure"]
-},NS.DEFAULT_SECTION_ORDER=DEFAULT_SECTION_ORDER,NS.getSectionOrder=function(){
-const stored=NS.storage.getSync("sectionOrder",null)
+},NS.DEFAULT_SECTION_ORDER=DEFAULT_SECTION_ORDER,NS.getSectionOrderFor=function(platform){
+const stored=NS.storage.getSync("sectionOrder"+platform,null)
 ;if(!Array.isArray(stored)||0===stored.length)return[...DEFAULT_SECTION_ORDER]
 ;const known=stored.filter(key=>DEFAULT_SECTION_ORDER.includes(key))
 ;return[...known,...DEFAULT_SECTION_ORDER.filter(key=>!known.includes(key))]
-},NS.setSectionOrder=order=>NS.storage.set("sectionOrder",order),
+},NS.setSectionOrderFor=(platform,order)=>NS.storage.set("sectionOrder"+platform,order),
+NS.getSectionOrder=()=>NS.getSectionOrderFor(currentPlatform()),
+NS.setSectionOrder=order=>NS.setSectionOrderFor(currentPlatform(),order),
 NS.BADGE_POSITION_OPTIONS=[{value:"default",label:"Default"
 },{value:"aboveTitle",label:"Above Game Title"},{
 value:"belowGameMedia",label:"Below Game Media"},{
@@ -128,19 +134,19 @@ label:"Above Right Side Metadata"},{
 value:"belowRightSidebarMetadata",
 label:"Below Right Side Metadata"},{value:"sidebarBottom",
 label:"Bottom of Right Sidebar"
-}],NS.PLATFORMS=["Steam","Epic"],NS.getBadgePositionFor=platform=>NS.storage.getSync("badgePosition"+platform,"default"),
+}],NS.getBadgePositionFor=platform=>NS.storage.getSync("badgePosition"+platform,"default"),
 NS.setBadgePositionFor=(platform,value)=>NS.storage.set("badgePosition"+platform,value),
 NS.getBadgePosition=()=>NS.getBadgePositionFor(currentPlatform()),
 NS.setBadgePosition=value=>NS.setBadgePositionFor(currentPlatform(),value),
 NS.getSiteEnabled=platform=>NS.storage.getSync("enabled"+platform,!0),
 NS.setSiteEnabled=(platform,value)=>NS.storage.set("enabled"+platform,value),
 NS.isEnabledForCurrentSite=()=>NS.getSiteEnabled(currentPlatform()),
-NS.getPlacementShared=()=>NS.storage.getSync("placementShared",!1),
-NS.setPlacementShared=value=>NS.storage.set("placementShared",value),
+NS.getSettingsShared=()=>NS.storage.getSync("placementShared",!1),
+NS.setSettingsShared=value=>NS.storage.set("placementShared",value),
 NS.getEnabledPlatforms=()=>NS.PLATFORMS.filter(p=>NS.getSiteEnabled(p)),
 NS.getVisiblePlatforms=()=>{
 const enabled=NS.getEnabledPlatforms()
-;return NS.getPlacementShared()?enabled.slice(0,1):enabled
+;return NS.getSettingsShared()?enabled.slice(0,1):enabled
 },NS.LOCATION_OPTIONS=[{value:"inline",
 label:"Inline (Default)"},...NS.BADGE_POSITION_OPTIONS]
 ;const DEFAULT_SECTION_LOCATIONS={hltb:"belowGameMedia",
@@ -175,11 +181,12 @@ if("undefined"==typeof GM_registerMenuCommand)return
 ;for(const key of Object.keys(CONFIG_KEYS))canUnregister&&void 0!==menuCommandIds[key]&&GM_unregisterMenuCommand(menuCommandIds[key]),
 menuCommandIds[key]=GM_registerMenuCommand(menuLabel(key),()=>NS.toggleConfig(key))
 },NS.toggleConfig=function(key){
-NS.storage.set(key,!NS.getConfig(key)),NS.registerMenuCommands()
-}
-}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
-"use strict";const ESRB_FULL_NAMES={e:"Everyone",
-everyone:"Everyone","e10+":"Everyone 10+",
+const platform=currentPlatform(),newValue=!NS.getConfigFor(key,platform)
+;(NS.getSettingsShared()?NS.PLATFORMS:[platform]).forEach(p=>NS.setConfigFor(key,p,newValue)),
+NS.registerMenuCommands()}
+}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),
+function(NS){"use strict";const ESRB_FULL_NAMES={
+e:"Everyone",everyone:"Everyone","e10+":"Everyone 10+",
 "e 10+":"Everyone 10+","everyone 10+":"Everyone 10+",
 t:"Teen",teen:"Teen",m:"Mature 17+",mature:"Mature 17+",
 "mature 17+":"Mature 17+",ao:"Adults Only",
@@ -403,12 +410,16 @@ if(!NS.getConfig("showReview")||!reviewSummary)return""
 ;const link=reviewUrl?`<a href="${encodeURI(reviewUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:10px;color:#ff3e3e;text-transform:uppercase;font-weight:bold;text-decoration:none;flex-shrink:0;">Full Review ↗</a>`:""
 ;return`<div style="${sectionRow("display:flex;flex-direction:column;gap:4px;")}"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><span style="color:#a1b0bd;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Review Summary:</span>${link}</div><span style="font-size:13px;line-height:1.55;color:#e4e9ee;">${NS.escapeHtml(reviewSummary)}</span></div>`
 }function buildHltbRow(hltbData,hltbUrl){
-if(!NS.getConfig("showHltb")||!(hltbData&&hltbData.length>0))return""
-;const displayData=hltbData.filter(item=>!/all styles/i.test(item.label))
-;return 0===displayData.length?"":hltbSectionHtml("HowLongToBeat","#66c0f4",displayData,hltbUrl)
-}function hltbSectionHtml(title,color,data,hltbUrl){
+if(!NS.getConfig("showHltb"))return""
+;const displayData=(hltbData||[]).filter(item=>!/all styles/i.test(item.label))
+;return displayData.length>0?hltbSectionHtml("HowLongToBeat","#66c0f4",displayData,hltbUrl):NS.getConfig("showHltbSearchFallback")?function(hltbUrl){
+if(!hltbUrl)return""
+;const label=/\/game\//i.test(hltbUrl)?"View on HowLongToBeat":"Search on HowLongToBeat"
+;return`<div style="${sectionRow("display:flex;align-items:center;justify-content:space-between;")}"><a href="${hltbUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:#66c0f4;font-weight:bold;text-decoration:none;text-transform:uppercase;letter-spacing:0.3px;">${label} ↗</a>${gearButtonHtml()}</div>`
+}(hltbUrl):""}
+function hltbSectionHtml(title,color,data,hltbUrl){
 const items=data.map(item=>statBlock(item.time,NS.relabelHltb(item.label),"16px",color,"10px")).join(divider("26px"))
-;return`<div style="${sectionRow("display:flex;flex-direction:column;gap:8px;")}"><div style="display:flex;align-items:center;justify-content:space-between;"><a href="${encodeURI(hltbUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:10px;color:${color};text-transform:uppercase;font-weight:bold;text-decoration:none;">${title} ↗</a>${gearButtonHtml()}</div><div style="display:flex;align-items:center;justify-content:space-around;background:rgba(0,0,0,0.4);padding:8px 4px;border-radius:4px;">${items}</div></div>`
+;return`<div style="${sectionRow("display:flex;flex-direction:column;gap:8px;")}"><div style="display:flex;align-items:center;justify-content:space-between;"><a href="${hltbUrl}" target="_blank" rel="noopener noreferrer" style="font-size:10px;color:${color};text-transform:uppercase;font-weight:bold;text-decoration:none;">${title} ↗</a>${gearButtonHtml()}</div><div style="display:flex;align-items:center;justify-content:space-around;background:rgba(0,0,0,0.4);padding:8px 4px;border-radius:4px;">${items}</div></div>`
 }
 NS.buildLeisureRow=(leisureData,hltbUrl)=>NS.getConfig("showLeisure")&&leisureData&&0!==leisureData.length?hltbSectionHtml("HLTB Leisure Time","#9b59b6",leisureData,hltbUrl):""
 ;const resolveHltbUrl=(hltbUrl,displayName)=>hltbUrl||`https://howlongtobeat.com/?q=${encodeURIComponent(displayName)}`
@@ -522,59 +533,63 @@ if(document.querySelector(".ign_settings_gear_standalone"))return
 ;targetObj&&insertAtTarget(makeCtn("ign_settings_gear_standalone","display:flex;align-items:center;justify-content:flex-end;padding:6px 2px;grid-column:1/-1;",'<button type="button" class="ign_open_settings_gear" title="IGN Metadata Injector settings" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#a1b0bd;cursor:pointer;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.3px;padding:5px 10px;">⚙ Settings</button>'),targetObj)
 }
 }(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
-"use strict";function buildSettingsPanelHtml(){
-const enableRows=NS.PLATFORMS.map(p=>`<label class="ign_settings_toggle_row"><span>Enable on ${p}</span><span class="ign_switch"><input type="checkbox" data-site-enable="${p}" ${NS.getSiteEnabled(p)?"checked":""}><span class="ign_switch_slider"></span></span></label>`).join(""),shared=NS.getPlacementShared(),placementPlatforms=NS.getVisiblePlatforms(),separatePlatforms=placementPlatforms.length?placementPlatforms:NS.PLATFORMS,isKeySeparate=key=>separatePlatforms.some(p=>"inline"!==NS.getSectionLocationFor(key,p)),orderRows=NS.getSectionOrder().map(key=>`<li class="ign_order_item" draggable="true" data-key="${key}"><label class="ign_separate_checkbox_wrap"><input type="checkbox" class="ign_separate_checkbox" data-key="${key}" ${isKeySeparate(key)?"checked":""}></label><span class="ign_order_handle">⠿</span><span style="flex:1;">${NS.escapeHtml(NS.SECTION_LABELS[key]||key)}</span><label class="ign_switch"><input type="checkbox" class="ign_visible_checkbox" data-key="${key}" ${(key=>(NS.SECTION_CONFIG_KEYS[key]||[]).some(ck=>NS.getConfig(ck)))(key)?"checked":""}><span class="ign_switch_slider"></span></label></li>`).join(""),combineAllChecked=separatePlatforms.some(p=>NS.getCombineAllFor(p)),platformLabelHtml=platform=>shared?"":`<label style="display:block;font-size:10px;color:#a1b0bd;text-transform:uppercase;font-weight:bold;margin-bottom:5px;">${platform}</label>`,userOverrides=NS.getUserOverrides(),overrideKeys=Object.keys(userOverrides),overrideRowsHtml=0===overrideKeys.length?"":overrideKeys.map(key=>{
-const entry=userOverrides[key],pills=[entry.ignUrl?'<span class="ign_override_pill">IGN</span>':"",entry.hltbUrl?'<span class="ign_override_pill ign_override_pill_hltb">HLTB</span>':""].join("")
-;return`<li class="ign_override_item"><span class="ign_override_item_main"><strong title="${NS.escapeHtml(entry.displayTitle||key)}">${NS.escapeHtml(entry.displayTitle||key)}</strong>${pills}</span><button class="ign_override_remove" data-key="${NS.escapeHtml(key)}" title="Remove override">✕</button></li>`
-}).join("")
-;return`\n            \n        <style>\n            #ign_settings_overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: flex; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }\n            #ign_settings_panel { background: linear-gradient(135deg, rgba(20,20,20,0.98), rgba(35,35,35,0.98)); border-radius: 10px; border-left: 5px solid #ff3e3e; box-shadow: 0 8px 30px rgba(0,0,0,0.6); width: 520px; max-width: 92vw; max-height: 85vh; overflow-y: auto; padding: 20px 22px; color: #ffffff; } #ign_settings_panel h2 { margin: 0 0 4px; font-size: 16px; color: #ff3e3e; text-transform: uppercase; letter-spacing: 0.5px; }\n            #ign_settings_panel h3 { margin: 0 0 10px; font-size: 11px; color: #a1b0bd; text-transform: uppercase; letter-spacing: 0.5px; } .ign_settings_sub { font-size: 11px; color: #8f98a0; margin: 0 0 18px; } .ign_settings_columns { display: flex; gap: 22px; flex-wrap: wrap; } .ign_settings_columns > div { flex: 1; min-width: 210px; }\n            .ign_settings_toggle_row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 12px; color: #c6d4df; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer; } .ign_switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; margin-left: 10px; } .ign_switch input { opacity: 0; width: 0; height: 0; }\n            .ign_switch_slider { position: absolute; inset: 0; background: rgba(255,255,255,0.15); border-radius: 20px; transition: 0.2s; } .ign_switch_slider::before { content: ""; position: absolute; height: 14px; width: 14px; left: 3px; top: 3px; background: #ffffff; border-radius: 50%; transition: 0.2s; } .ign_switch input:checked + .ign_switch_slider { background: #66c0f4; } .ign_switch input:checked + .ign_switch_slider::before { transform: translateX(16px); }\n            #ign_order_list { list-style: none; margin: 0; padding: 0; } .ign_order_item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 12px; color: #c6d4df; cursor: grab; } .ign_order_item.ign_drag_over { border: 1px dashed #66c0f4; } .ign_order_handle { color: #8f98a0; font-size: 14px; } .ign_settings_actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }\n            .ign_order_list_header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; } .ign_order_list_header h3 { margin: 0; flex: 1; text-align: center; }\n            .ign_separate_col_label { flex-shrink: 0; width: 58px; font-size: 10px; color: #a1b0bd; text-transform: uppercase; font-weight: bold; letter-spacing: 0.2px; line-height: 1.15; }\n            .ign_visible_col_label { flex-shrink: 0; width: 58px; text-align: right; font-size: 10px; color: #a1b0bd; text-transform: uppercase; font-weight: bold; letter-spacing: 0.2px; line-height: 1.15; }\n            .ign_separate_checkbox_wrap { flex-shrink: 0; display: flex; align-items: center; }\n            .ign_separate_checkbox { width: 15px; height: 15px; accent-color: #66c0f4; cursor: pointer; }\n            .ign_order_item .ign_switch { margin-left: auto; }\n            .ign_settings_actions button { border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; } #ign_settings_save { background: #ff3e3e; color: #ffffff; } #ign_settings_cancel { background: rgba(255,255,255,0.1); color: #c6d4df; }\n            .ign_settings_select { width: 100%; background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; } .ign_settings_columns > div, .ign_locations_row > div { flex: 1; min-width: 200px; } .ign_locations_row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 18px; } #ign_override_list { list-style: none; margin: 0 0 10px; padding: 0; max-height: 160px; overflow-y: auto; }\n            .ign_key_location_block { margin-top: 10px; } .ign_key_location_block h3, #ign_overlay_position_heading { margin-top: 4px; font-weight: bold; color: #c6d4df; font-size: 12px; }\n            .ign_override_item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 12px; color: #c6d4df; } .ign_override_item_main { display: flex; align-items: center; gap: 8px; overflow: hidden; } .ign_override_item_main strong { font-size: 12px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n            .ign_override_pill { font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; color: #ff3e3e; border: 1px solid rgba(255,62,62,0.5); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; } .ign_override_pill_hltb { color: #66c0f4; border-color: rgba(102,192,244,0.5); } .ign_override_remove { background: transparent; border: none; color: #8f98a0; cursor: pointer; font-size: 13px; padding: 2px 6px; flex-shrink: 0; } .ign_override_remove:hover { color: #ff3e3e; }\n            .ign_override_empty { font-size: 11px; color: #8f98a0; margin: 0 0 10px; } .ign_override_form { display: flex; flex-direction: column; gap: 6px; } .ign_override_form input { background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; }\n            .ign_override_form button { align-self: flex-end; border: none; border-radius: 6px; padding: 7px 14px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; background: rgba(102,192,244,0.15); color: #66c0f4; }\n        </style>\n            <div id="ign_settings_overlay">\n                <div id="ign_settings_panel">\n                    <h2>IGN Script Settings</h2>\n                    <p class="ign_settings_sub">Changes apply immediately on save — no page refresh needed.</p>\n                    <div class="ign_settings_columns">\n                        <div>\n                            <div class="ign_order_list_header"><span class="ign_separate_col_label">Separate Entry</span><h3>Section Order (drag to reorder)</h3><span class="ign_visible_col_label">Visible</span></div>\n                            <ul id="ign_order_list">${orderRows}</ul>\n                            <div style="margin-top:4px;">\n                                <label class="ign_settings_toggle_row" style="border-bottom:none;">\n                                    <span>Combine all entries in one place</span>\n                                    <span class="ign_switch"><input type="checkbox" id="ign_combine_all" ${combineAllChecked?"checked":""}><span class="ign_switch_slider"></span></span>\n                                </label>\n                                <div id="ign_combine_all_locations" class="ign_locations_row" style="margin-top:8px;${combineAllChecked?"":"display:none;"}">${placementPlatforms.map(platform=>{
-const current=NS.getCombineLocationFor(platform),opts=NS.LOCATION_OPTIONS.map(opt=>`<option value="${opt.value}" ${opt.value===current?"selected":""}>${NS.escapeHtml(opt.label)}</option>`).join("")
-;return`<div>${platformLabelHtml(platform)}<select id="ign_combine_location_${platform}" class="ign_settings_select">${opts}</select></div>`
-}).join("")}</div>\n                            </div>\n                        </div>\n                    </div>\n                    <div style="margin-top:18px;"><h3>Enable / Disable Per Site</h3>${enableRows}</div>\n                    <div style="margin-top:18px;">\n                        <label class="ign_settings_toggle_row" style="border-bottom:none;">\n                            <span>Share the same placement for Steam and Epic</span>\n                            <span class="ign_switch"><input type="checkbox" id="ign_placement_shared" ${shared?"checked":""}><span class="ign_switch_slider"></span></span>\n                        </label>\n                    </div>\n                    ${0===placementPlatforms.length?'<p class="ign_settings_sub">Enable at least one site above to configure placement.</p>':`\n                    <div style="margin-top:10px;"><h3 id="ign_overlay_position_heading">Overlay Position</h3><div class="ign_locations_row">${placementPlatforms.map(platform=>{
-const current=NS.getBadgePositionFor(platform),opts=NS.BADGE_POSITION_OPTIONS.map(opt=>`<option value="${opt.value}" ${opt.value===current?"selected":""}>${NS.escapeHtml(opt.label)}</option>`).join("")
-;return`<div>${platformLabelHtml(platform)}<select id="ign_badge_position_${platform}" class="ign_settings_select">${opts}</select></div>`
-}).join("")}</div></div>\n                    <div id="ign_key_locations_wrap" style="${combineAllChecked?"display:none;":""}">${NS.getSectionOrder().filter(isKeySeparate).map(key=>((key,platforms)=>{
-const heading=NS.SECTION_LABELS[key]||key
-;return`<div class="ign_key_location_block" data-key-location-block="${key}"><h3>${NS.escapeHtml(heading)}</h3><div class="ign_locations_row">${platforms.map(p=>((key,platform)=>{
-const current=NS.getSectionLocationFor(key,platform),opts=NS.LOCATION_OPTIONS.map(opt=>`<option value="${opt.value}" ${opt.value===current?"selected":""}>${NS.escapeHtml(opt.label)}</option>`).join("")
-;return`<div>${platformLabelHtml(platform)}<select id="ign_${key}_location_${platform}" class="ign_settings_select" data-key="${key}" data-platform="${platform}">${opts}</select></div>`
-})(key,p)).join("")}</div></div>`
-})(key,placementPlatforms)).join("")}</div>\n                    <div id="ign_shared_location_notes" style="${combineAllChecked?"display:none;":""}"></div>`}\n                    <div style="margin-top:18px;">\n                        <h3>Per-Title Overrides</h3>\n                        <p class="ign_settings_sub" style="margin-bottom:8px;">Add/Override IGN/HowLongToBeat data. Useful when no data is found.</p>\n                        ${0===overrideKeys.length?'<p class="ign_override_empty">No overrides added yet.</p>':`<ul id="ign_override_list">${overrideRowsHtml}</ul>`}\n                        <div class="ign_override_form">\n                            <input type="text" id="ign_override_title" placeholder="Game title, exactly as shown on the store page">\n                            <input type="text" id="ign_override_ign_url" placeholder="IGN URL (optional) — e.g. https://www.ign.com/games/some-slug">\n                            <input type="text" id="ign_override_hltb_url" placeholder="HowLongToBeat URL (optional) — e.g. https://howlongtobeat.com/game/1234">\n                            <button id="ign_override_add">Add / Update</button>\n                        </div>\n                    </div>\n                    <div class="ign_settings_actions"><button id="ign_settings_cancel">Cancel</button><button id="ign_settings_save">Save</button></div>\n                </div>\n            </div>`
-}function refreshBadgeNow(){
+"use strict";let pagerPlatform=null
+;function getEffectivePlatform(){
+const enabled=NS.getEnabledPlatforms()
+;return 0===enabled.length?NS.PLATFORMS[0]:NS.getSettingsShared()||1===enabled.length?enabled[0]:(pagerPlatform&&enabled.includes(pagerPlatform)||(pagerPlatform=enabled[0]),
+pagerPlatform)}function refreshBadgeNow(){
 NS.state.lastProcessedTitle="",document.querySelector(".ign_rating_row")?.remove(),
 NS.init()}NS.openSettingsPanel=function(){
-const prevOverlay=document.getElementById("ign_settings_overlay"),snapshot=function(overlay,list){
+const prevOverlay=document.getElementById("ign_settings_overlay"),prevPanelEl=prevOverlay?prevOverlay.querySelector("#ign_settings_panel"):null,prevScrollTop=prevPanelEl?prevPanelEl.scrollTop:0,prevPlatform=prevOverlay?prevOverlay.dataset.ignPlatform:null,snapshot=function(overlay,list,platform){
 if(!overlay||!list)return null
 ;const mapChecked=sel=>Array.from(overlay.querySelectorAll(sel)).reduce((m,el)=>(m[el.dataset.key]=el.checked,
 m),{}),mapValues=sel=>Array.from(overlay.querySelectorAll(sel)).reduce((m,el)=>(m[el.id]=el.value,
-m),{});return{
+m),{});return{platform:platform,
 order:Array.from(list.querySelectorAll(".ign_order_item")).map(li=>li.dataset.key),
 visible:mapChecked(".ign_visible_checkbox"),
 separate:mapChecked(".ign_separate_checkbox"),
 combineAll:overlay.querySelector("#ign_combine_all")?overlay.querySelector("#ign_combine_all").checked:null,
+hltbSearchFallback:overlay.querySelector("#ign_hltb_search_fallback")?overlay.querySelector("#ign_hltb_search_fallback").checked:null,
 locationSelects:mapValues("[data-key-location-block] select"),
 combineLocationSelects:mapValues('[id^="ign_combine_location_"]'),
 positionSelects:mapValues('[id^="ign_badge_position_"]')}
-}(prevOverlay,prevOverlay?prevOverlay.querySelector("#ign_order_list"):null)
+}(prevOverlay,prevOverlay?prevOverlay.querySelector("#ign_order_list"):null,prevPlatform)
 ;prevOverlay?.remove(),
-document.body.insertAdjacentHTML("beforeend",buildSettingsPanelHtml())
-;const overlay=document.getElementById("ign_settings_overlay"),list=document.getElementById("ign_order_list")
+document.body.insertAdjacentHTML("beforeend",function(){
+const platform=getEffectivePlatform(),shared=NS.getSettingsShared(),enabledPlatforms=NS.getEnabledPlatforms(),showPager=!shared&&enabledPlatforms.length>1,enableRows=NS.PLATFORMS.map(p=>`<label class="ign_settings_toggle_row"><span>Enable on ${p}</span><span class="ign_switch"><input type="checkbox" data-site-enable="${p}" ${NS.getSiteEnabled(p)?"checked":""}><span class="ign_switch_slider"></span></span></label>`).join(""),isKeySeparate=key=>"inline"!==NS.getSectionLocationFor(key,platform),orderRows=NS.getSectionOrderFor(platform).map(key=>`<li class="ign_order_item" draggable="true" data-key="${key}"><label class="ign_separate_checkbox_wrap"><input type="checkbox" class="ign_separate_checkbox" data-key="${key}" ${isKeySeparate(key)?"checked":""}></label><span class="ign_order_handle">⠿</span><span style="flex:1;">${NS.escapeHtml(NS.SECTION_LABELS[key]||key)}</span><label class="ign_switch"><input type="checkbox" class="ign_visible_checkbox" data-key="${key}" ${(key=>(NS.SECTION_CONFIG_KEYS[key]||[]).some(ck=>NS.getConfigFor(ck,platform)))(key)?"checked":""}><span class="ign_switch_slider"></span></label></li>`).join(""),combineAllChecked=NS.getCombineAllFor(platform),userOverrides=NS.getUserOverrides(),overrideKeys=Object.keys(userOverrides),overrideRowsHtml=0===overrideKeys.length?"":overrideKeys.map(key=>{
+const entry=userOverrides[key],pills=[entry.ignUrl?'<span class="ign_override_pill">IGN</span>':"",entry.hltbUrl?'<span class="ign_override_pill ign_override_pill_hltb">HLTB</span>':""].join("")
+;return`<li class="ign_override_item"><span class="ign_override_item_main"><strong title="${NS.escapeHtml(entry.displayTitle||key)}">${NS.escapeHtml(entry.displayTitle||key)}</strong>${pills}</span><button class="ign_override_remove" data-key="${NS.escapeHtml(key)}" title="Remove override">✕</button></li>`
+}).join("")
+;return`\n            \n        <style>\n            #ign_settings_overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: flex; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }\n            #ign_settings_panel { background: linear-gradient(135deg, rgba(20,20,20,0.98), rgba(35,35,35,0.98)); border-radius: 10px; border-left: 5px solid #ff3e3e; box-shadow: 0 8px 30px rgba(0,0,0,0.6); width: 520px; max-width: 92vw; max-height: 85vh; overflow-y: auto; padding: 20px 22px; color: #ffffff; } #ign_settings_panel h2 { margin: 0 0 4px; font-size: 16px; color: #ff3e3e; text-transform: uppercase; letter-spacing: 0.5px; }\n            #ign_settings_panel h3 { margin: 0 0 10px; font-size: 11px; color: #a1b0bd; text-transform: uppercase; letter-spacing: 0.5px; } .ign_settings_sub { font-size: 11px; color: #8f98a0; margin: 0 0 18px; } .ign_settings_columns { display: flex; gap: 22px; flex-wrap: wrap; } .ign_settings_columns > div { flex: 1; min-width: 210px; }\n            .ign_settings_toggle_row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 12px; color: #c6d4df; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer; } .ign_switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; margin-left: 10px; } .ign_switch input { opacity: 0; width: 0; height: 0; }\n            .ign_switch_slider { position: absolute; inset: 0; background: rgba(255,255,255,0.15); border-radius: 20px; transition: 0.2s; } .ign_switch_slider::before { content: ""; position: absolute; height: 14px; width: 14px; left: 3px; top: 3px; background: #ffffff; border-radius: 50%; transition: 0.2s; } .ign_switch input:checked + .ign_switch_slider { background: #66c0f4; } .ign_switch input:checked + .ign_switch_slider::before { transform: translateX(16px); }\n            #ign_order_list { list-style: none; margin: 0; padding: 0; } .ign_order_item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 12px; color: #c6d4df; cursor: grab; } .ign_order_item.ign_drag_over { border: 1px dashed #66c0f4; } .ign_order_handle { color: #8f98a0; font-size: 14px; } .ign_settings_actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }\n            .ign_order_list_header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; } .ign_order_list_header h3 { margin: 0; flex: 1; text-align: center; }\n            .ign_separate_col_label { flex-shrink: 0; width: 58px; font-size: 10px; color: #a1b0bd; text-transform: uppercase; font-weight: bold; letter-spacing: 0.2px; line-height: 1.15; }\n            .ign_visible_col_label { flex-shrink: 0; width: 58px; text-align: right; font-size: 10px; color: #a1b0bd; text-transform: uppercase; font-weight: bold; letter-spacing: 0.2px; line-height: 1.15; }\n            .ign_separate_checkbox_wrap { flex-shrink: 0; display: flex; align-items: center; }\n            .ign_separate_checkbox { width: 15px; height: 15px; accent-color: #66c0f4; cursor: pointer; }\n            .ign_order_item .ign_switch { margin-left: auto; }\n            .ign_settings_actions button { border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; } #ign_settings_save { background: #ff3e3e; color: #ffffff; } #ign_settings_cancel { background: rgba(255,255,255,0.1); color: #c6d4df; }\n            .ign_settings_select { width: 100%; background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; } .ign_settings_columns > div, .ign_locations_row > div { flex: 1; min-width: 200px; } .ign_locations_row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 18px; } #ign_override_list { list-style: none; margin: 0 0 10px; padding: 0; max-height: 160px; overflow-y: auto; }\n            .ign_key_location_block { margin-top: 10px; } .ign_key_location_block h3, #ign_overlay_position_heading { margin-top: 4px; font-weight: bold; color: #c6d4df; font-size: 12px; }\n            .ign_override_item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 12px; color: #c6d4df; } .ign_override_item_main { display: flex; align-items: center; gap: 8px; overflow: hidden; } .ign_override_item_main strong { font-size: 12px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n            .ign_override_pill { font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; color: #ff3e3e; border: 1px solid rgba(255,62,62,0.5); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; } .ign_override_pill_hltb { color: #66c0f4; border-color: rgba(102,192,244,0.5); } .ign_override_remove { background: transparent; border: none; color: #8f98a0; cursor: pointer; font-size: 13px; padding: 2px 6px; flex-shrink: 0; } .ign_override_remove:hover { color: #ff3e3e; }\n            .ign_override_empty { font-size: 11px; color: #8f98a0; margin: 0 0 10px; } .ign_override_form { display: flex; flex-direction: column; gap: 6px; } .ign_override_form input { background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; }\n            .ign_override_form button { align-self: flex-end; border: none; border-radius: 6px; padding: 7px 14px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; background: rgba(102,192,244,0.15); color: #66c0f4; }\n            .ign_platform_pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 10px 0 4px; }\n            .ign_pager_arrow { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #c6d4df; border-radius: 6px; width: 30px; height: 30px; font-size: 16px; line-height: 1; cursor: pointer; }\n            .ign_pager_arrow:hover { background: rgba(255,255,255,0.12); color: #ffffff; }\n            .ign_pager_label { font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; color: #ffffff; min-width: 90px; text-align: center; }\n        </style>\n            <div id="ign_settings_overlay" data-ign-platform="${platform}">\n                <div id="ign_settings_panel">\n                    <h2>IGN Script Settings</h2>\n                    <p class="ign_settings_sub">Changes apply immediately on save — no page refresh needed.</p>\n                    <div style="margin-bottom:14px;">\n                        <label class="ign_settings_toggle_row" style="border-bottom:none;">\n                            <span>Use the same settings for Steam and Epic</span>\n                            <span class="ign_switch"><input type="checkbox" id="ign_placement_shared" ${shared?"checked":""}><span class="ign_switch_slider"></span></span>\n                        </label>\n                        <div class="ign_platform_pager" style="${showPager?"":"display:none;"}">\n                            <button type="button" id="ign_pager_prev" class="ign_pager_arrow" aria-label="Previous platform">‹</button>\n                            <span class="ign_pager_label">${NS.escapeHtml(platform)} Settings</span>\n                            <button type="button" id="ign_pager_next" class="ign_pager_arrow" aria-label="Next platform">›</button>\n                        </div>\n                    </div>\n                    <div class="ign_settings_columns">\n                        <div>\n                            <div class="ign_order_list_header"><span class="ign_separate_col_label">Separate Entry</span><h3>Section Order (drag to reorder)</h3><span class="ign_visible_col_label">Visible</span></div>\n                            <ul id="ign_order_list">${orderRows}</ul>\n                            <div style="margin-top:4px;">\n                                <label class="ign_settings_toggle_row" style="border-bottom:none;">\n                                    <span>Combine all entries in one place</span>\n                                    <span class="ign_switch"><input type="checkbox" id="ign_combine_all" ${combineAllChecked?"checked":""}><span class="ign_switch_slider"></span></span>\n                                </label>\n                                <div id="ign_combine_all_locations" class="ign_locations_row" style="margin-top:8px;${combineAllChecked?"":"display:none;"}">${(()=>{
+const current=NS.getCombineLocationFor(platform),opts=NS.LOCATION_OPTIONS.map(opt=>`<option value="${opt.value}" ${opt.value===current?"selected":""}>${NS.escapeHtml(opt.label)}</option>`).join("")
+;return`<div><select id="ign_combine_location_${platform}" class="ign_settings_select">${opts}</select></div>`
+})()}</div>\n                            </div>\n                            <label class="ign_settings_toggle_row" style="border-bottom:none;margin-top:4px;">\n                                <span>Search HowLongToBeat link when no data found</span>\n                                <span class="ign_switch"><input type="checkbox" id="ign_hltb_search_fallback" ${NS.getConfigFor("showHltbSearchFallback",platform)?"checked":""}><span class="ign_switch_slider"></span></span>\n                            </label>\n                        </div>\n                    </div>\n                    <div style="margin-top:18px;"><h3>Enable / Disable Per Site</h3>${enableRows}</div>\n                    <div style="margin-top:10px;"><h3 id="ign_overlay_position_heading">Overlay Position</h3><div class="ign_locations_row">${(()=>{
+const current=NS.getBadgePositionFor(platform),opts=NS.BADGE_POSITION_OPTIONS.map(opt=>`<option value="${opt.value}" ${opt.value===current?"selected":""}>${NS.escapeHtml(opt.label)}</option>`).join("")
+;return`<div><select id="ign_badge_position_${platform}" class="ign_settings_select">${opts}</select></div>`
+})()}</div></div>\n                    <div id="ign_key_locations_wrap" style="${combineAllChecked?"display:none;":""}">${NS.getSectionOrderFor(platform).filter(isKeySeparate).map(key=>{
+const heading=NS.SECTION_LABELS[key]||key
+;return`<div class="ign_key_location_block" data-key-location-block="${key}"><h3>${NS.escapeHtml(heading)}</h3><div class="ign_locations_row">${(key=>{
+const current=NS.getSectionLocationFor(key,platform),opts=NS.LOCATION_OPTIONS.map(opt=>`<option value="${opt.value}" ${opt.value===current?"selected":""}>${NS.escapeHtml(opt.label)}</option>`).join("")
+;return`<div><select id="ign_${key}_location_${platform}" class="ign_settings_select" data-key="${key}">${opts}</select></div>`
+})(key)}</div></div>`
+}).join("")}</div>\n                    <div id="ign_shared_location_notes" style="${combineAllChecked?"display:none;":""}"></div>\n                    <div style="margin-top:18px;">\n                        <h3>Per-Title Overrides</h3>\n                        <p class="ign_settings_sub" style="margin-bottom:8px;">Add/Override IGN/HowLongToBeat data. Useful when no data is found. Shared between Steam and Epic.</p>\n                        ${0===overrideKeys.length?'<p class="ign_override_empty">No overrides added yet.</p>':`<ul id="ign_override_list">${overrideRowsHtml}</ul>`}\n                        <div class="ign_override_form">\n                            <input type="text" id="ign_override_title" placeholder="Game title, exactly as shown on the store page">\n                            <input type="text" id="ign_override_ign_url" placeholder="IGN URL (optional) — e.g. https://www.ign.com/games/some-slug">\n                            <input type="text" id="ign_override_hltb_url" placeholder="HowLongToBeat URL (optional) — e.g. https://howlongtobeat.com/game/1234">\n                            <button id="ign_override_add">Add / Update</button>\n                        </div>\n                    </div>\n                    <div class="ign_settings_actions"><button id="ign_settings_cancel">Cancel</button><button id="ign_settings_save">Save</button></div>\n                </div>\n            </div>`
+}())
+;const overlay=document.getElementById("ign_settings_overlay"),panelEl=document.getElementById("ign_settings_panel"),list=document.getElementById("ign_order_list")
 ;function syncSharedLocationNotes(){
 const container=overlay.querySelector("#ign_shared_location_notes")
 ;if(!container)return
-;const order=Array.from(list.querySelectorAll(".ign_order_item")).map(li=>li.dataset.key),shared=NS.getPlacementShared(),sections=[]
-;NS.getVisiblePlatforms().forEach(platform=>{
-const groups=function(overlay,platform){const byLoc={}
-;return overlay.querySelectorAll(`[data-key-location-block] select[data-platform="${platform}"]`).forEach(sel=>{
+;const order=Array.from(list.querySelectorAll(".ign_order_item")).map(li=>li.dataset.key),groups=function(overlay){
+const byLoc={}
+;return overlay.querySelectorAll("[data-key-location-block] select").forEach(sel=>{
 (byLoc[sel.value]=byLoc[sel.value]||[]).push(sel.dataset.key)
 }),Object.keys(byLoc).filter(loc=>"inline"!==loc&&byLoc[loc].length>1).map(loc=>({
-loc:loc,keys:byLoc[loc]}))}(overlay,platform)
-;if(!groups.length)return;const lines=groups.map(g=>{
+loc:loc,keys:byLoc[loc]}))}(overlay)
+;if(!groups.length)return void(container.innerHTML="")
+;const lines=groups.map(g=>{
 const names=order.filter(k=>g.keys.includes(k)).map(k=>NS.escapeHtml(NS.SECTION_LABELS[k]||k)).join(" ; ")
 ;return`<strong style="color:#c6d4df;">${NS.escapeHtml((NS.LOCATION_OPTIONS.find(o=>o.value===g.loc)||{}).label||g.loc)}</strong> : ${names}`
-}),prefix=shared?"":`<strong style="color:#c6d4df;">${NS.escapeHtml(platform)}</strong><br>`
-;sections.push(`${prefix}${lines.join("<br>")}`)
-}),container.innerHTML=sections.length?`<p class="ign_settings_sub" style="margin-top:10px;margin-bottom:0;"><strong style="color:#c6d4df;">Overlapping Locations:</strong><br>${sections.join("<br>")}<br><br><span style="opacity:0.8;">Drag items in Section Order above to change their combined order.</span></p>`:""
+})
+;container.innerHTML=`<p class="ign_settings_sub" style="margin-top:10px;margin-bottom:0;"><strong style="color:#c6d4df;">Overlapping Locations:</strong><br>${lines.join("<br>")}<br><br><span style="opacity:0.8;">Drag items in Section Order above to change their combined order.</span></p>`
 }!function(listEl){let draggedItem=null
 ;listEl.querySelectorAll(".ign_order_item").forEach(item=>{
 item.addEventListener("dragstart",()=>{
@@ -592,8 +607,8 @@ const key=checkbox.dataset.key,wrap=overlay.querySelector("#ign_key_locations_wr
 ;if(!wrap)return
 ;const existing=wrap.querySelector(`[data-key-location-block="${key}"]`)
 ;if(checkbox.checked&&!existing){
-const platforms=NS.getVisiblePlatforms(),shared=NS.getPlacementShared(),opts=NS.LOCATION_OPTIONS.map(opt=>`<option value="${opt.value}" ${"belowGameMedia"===opt.value?"selected":""}>${NS.escapeHtml(opt.label)}</option>`).join(""),heading=NS.SECTION_LABELS[key]||key,selects=platforms.map(p=>`<div>${shared?"":`<label style="display:block;font-size:10px;color:#a1b0bd;text-transform:uppercase;font-weight:bold;margin-bottom:5px;">${p}</label>`}<select id="ign_${key}_location_${p}" class="ign_settings_select" data-key="${key}" data-platform="${p}">${opts}</select></div>`).join("")
-;wrap.insertAdjacentHTML("beforeend",`<div class="ign_key_location_block" data-key-location-block="${key}"><h3>${NS.escapeHtml(heading)}</h3><div class="ign_locations_row">${selects}</div></div>`),
+const opts=NS.LOCATION_OPTIONS.map(opt=>`<option value="${opt.value}" ${"belowGameMedia"===opt.value?"selected":""}>${NS.escapeHtml(opt.label)}</option>`).join(""),heading=NS.SECTION_LABELS[key]||key,select=`<div><select id="ign_${key}_location_${getEffectivePlatform()}" class="ign_settings_select" data-key="${key}">${opts}</select></div>`
+;wrap.insertAdjacentHTML("beforeend",`<div class="ign_key_location_block" data-key-location-block="${key}"><h3>${NS.escapeHtml(heading)}</h3><div class="ign_locations_row">${select}</div></div>`),
 wrap.querySelectorAll(`[data-key-location-block="${key}"] select`).forEach(sel=>sel.addEventListener("change",syncSharedLocationNotes))
 }else!checkbox.checked&&existing&&existing.remove()
 ;syncSharedLocationNotes()})
@@ -605,7 +620,8 @@ const on=combineAllCheckbox.checked
 ;combineAllLocations&&(combineAllLocations.style.display=on?"":"none"),
 keyLocationsWrap&&(keyLocationsWrap.style.display=on?"none":""),
 sharedLocationNotes&&(sharedLocationNotes.style.display=on?"none":"")
-}),function(overlay,list,snap){if(snap){
+}),function(overlay,list,snap,platform){
+if(snap&&snap.platform===platform){
 if(snap.order.forEach(key=>{
 const li=list.querySelector(`.ign_order_item[data-key="${key}"]`)
 ;li&&list.appendChild(li)
@@ -620,11 +636,15 @@ cb.dispatchEvent(new Event("change",{bubbles:!0})))
 const cb=overlay.querySelector("#ign_combine_all")
 ;cb&&cb.checked!==snap.combineAll&&(cb.checked=snap.combineAll,
 cb.dispatchEvent(new Event("change",{bubbles:!0})))}
+if(null!==snap.hltbSearchFallback){
+const cb=overlay.querySelector("#ign_hltb_search_fallback")
+;cb&&(cb.checked=snap.hltbSearchFallback)}
 [snap.locationSelects,snap.combineLocationSelects,snap.positionSelects].forEach(map=>{
 Object.keys(map).forEach(id=>{
 const sel=overlay.querySelector("#"+id)
 ;sel&&(sel.value=map[id])})})}
-}(overlay,list,snapshot),syncSharedLocationNotes(),
+}(overlay,list,snapshot,getEffectivePlatform()),syncSharedLocationNotes(),
+panelEl&&(panelEl.scrollTop=prevScrollTop),
 overlay.querySelectorAll(".ign_override_remove").forEach(btn=>btn.addEventListener("click",()=>{
 NS.removeUserOverride(btn.dataset.key),
 refreshBadgeNow(),NS.openSettingsPanel()
@@ -633,40 +653,49 @@ const title=overlay.querySelector("#ign_override_title").value.trim(),ignUrl=ove
 ;title&&(ignUrl||hltbUrl)&&(NS.setUserOverride(title,ignUrl,hltbUrl),
 refreshBadgeNow(),NS.openSettingsPanel())
 }),overlay.querySelector("#ign_placement_shared").addEventListener("change",e=>{
-NS.setPlacementShared(e.target.checked),
-NS.openSettingsPanel()
-}),overlay.querySelectorAll("input[data-site-enable]").forEach(input=>input.addEventListener("change",()=>{
+NS.setSettingsShared(e.target.checked),
+NS.openSettingsPanel()})
+;const pagerPrev=overlay.querySelector("#ign_pager_prev"),pagerNext=overlay.querySelector("#ign_pager_next")
+;function flipPager(direction){
+const enabled=NS.getEnabledPlatforms(),idx=enabled.indexOf(getEffectivePlatform())
+;pagerPlatform=enabled[(idx+direction+enabled.length)%enabled.length],
+NS.openSettingsPanel()}
+pagerPrev&&pagerPrev.addEventListener("click",()=>flipPager(-1)),
+pagerNext&&pagerNext.addEventListener("click",()=>flipPager(1)),
+overlay.querySelectorAll("input[data-site-enable]").forEach(input=>input.addEventListener("change",()=>{
 NS.setSiteEnabled(input.dataset.siteEnable,input.checked),
 refreshBadgeNow(),NS.openSettingsPanel()
 })),overlay.addEventListener("click",e=>{
 e.target===overlay&&overlay.remove()
 }),overlay.querySelector("#ign_settings_cancel").addEventListener("click",()=>overlay.remove()),
 overlay.querySelector("#ign_settings_save").addEventListener("click",()=>{
-list.querySelectorAll(".ign_visible_checkbox").forEach(cb=>{
-(NS.SECTION_CONFIG_KEYS[cb.dataset.key]||[]).forEach(configKey=>NS.storage.set(configKey,cb.checked))
-}),
-NS.setSectionOrder(Array.from(list.querySelectorAll(".ign_order_item")).map(li=>li.dataset.key))
-;const shared=NS.getPlacementShared(),combineAllChecked=!!combineAllCheckbox&&combineAllCheckbox.checked
-;NS.getVisiblePlatforms().forEach(platform=>{
-const targets=shared?NS.PLATFORMS:[platform]
+const shared=NS.getSettingsShared(),platform=getEffectivePlatform(),targets=shared?NS.PLATFORMS:[platform]
+;list.querySelectorAll(".ign_visible_checkbox").forEach(cb=>{
+(NS.SECTION_CONFIG_KEYS[cb.dataset.key]||[]).forEach(configKey=>targets.forEach(p=>NS.setConfigFor(configKey,p,cb.checked)))
+})
+;const order=Array.from(list.querySelectorAll(".ign_order_item")).map(li=>li.dataset.key)
+;targets.forEach(p=>NS.setSectionOrderFor(p,order))
+;const combineAllChecked=!!combineAllCheckbox&&combineAllCheckbox.checked
 ;targets.forEach(p=>NS.setCombineAllFor(p,combineAllChecked))
+;const hltbSearchFallbackCb=overlay.querySelector("#ign_hltb_search_fallback")
+;hltbSearchFallbackCb&&targets.forEach(p=>NS.setConfigFor("showHltbSearchFallback",p,hltbSearchFallbackCb.checked))
 ;const combineSel=overlay.querySelector(`#ign_combine_location_${platform}`)
 ;combineSel&&targets.forEach(p=>NS.setCombineLocationFor(p,combineSel.value))
 ;const posSel=overlay.querySelector(`#ign_badge_position_${platform}`)
 ;posSel&&targets.forEach(p=>NS.setBadgePositionFor(p,posSel.value)),
-NS.getSectionOrder().forEach(key=>{
+order.forEach(key=>{
 const sel=overlay.querySelector(`#ign_${key}_location_${platform}`)
 ;targets.forEach(p=>NS.setSectionLocationFor(key,p,sel?sel.value:"inline"))
-})
-}),overlay.remove(),NS.registerMenuCommands(),refreshBadgeNow()
-})},NS.openSettings=function(){
+}),overlay.remove(),
+NS.registerMenuCommands(),refreshBadgeNow()})
+},NS.openSettings=function(){
 "undefined"!=typeof chrome&&chrome.runtime&&"function"==typeof chrome.runtime.openOptionsPage?chrome.runtime.openOptionsPage():NS.openSettingsPanel()
 },document.addEventListener("click",e=>{
 e.target.closest&&e.target.closest(".ign_open_settings_gear")&&NS.openSettings()
 })
 }(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
 "use strict"
-;const EDITION_NOISE_RE=/\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|director's cut|anniversary)\s*(edition)?\b/gi,STOPWORDS=new Set(["the","a","an","of","and","edition"]),ROMAN_TABLE=[[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]]
+;const EDITION_NOISE_RE=/\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|director's cut|anniversary|special)\s*(edition)?\b/gi,EDITION_QUALIFIER_TEST_RE=new RegExp(EDITION_NOISE_RE.source,"i"),STOPWORDS=new Set(["the","a","an","of","and","edition"]),ROMAN_TABLE=[[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]]
 ;function toRoman(num){let n=num,result=""
 ;for(const[value,numeral]of ROMAN_TABLE)for(;n>=value;)result+=numeral,
 n-=value;return result}const ROMAN_LOOKUP={}
@@ -712,7 +741,7 @@ if(!results||0===results.length)return callback(null)
 const name=function(obj){const names=obj?.metadata?.names
 ;return names?(names.name||names.short||names.alt&&names.alt[0]||null)?.trim()??null:null
 }(obj);if(!name||!obj.slug)return
-;const score=function(targetTokens,candidateTokens,storeYear,candidateObj){
+;let score=function(targetTokens,candidateTokens,storeYear,candidateObj){
 if(0===targetTokens.length||0===candidateTokens.length)return-1
 ;const targetSet=new Set(targetTokens),candidateSet=new Set(candidateTokens)
 ;let overlap=0;targetSet.forEach(t=>{
@@ -727,7 +756,8 @@ const dates=(obj?.objectRegions??[]).flatMap(r=>r.releases??[]).map(r=>r.date).f
 ;null!=ignYear&&(score+=ignYear===storeYear?.15:-.15)}
 return score
 }(targetTokens,significantTokens(name),storeYear,obj)
-;score>bestScore&&(bestScore=score,best=obj)
+;score>=0&&EDITION_QUALIFIER_TEST_RE.test(name)&&(score-=.35),
+score>bestScore&&(bestScore=score,best=obj)
 }),!best||bestScore<.5)return callback(null);callback({
 slug:String(best.slug).toLowerCase(),
 url:`https://www.ign.com/games/${best.slug}`})})
@@ -821,7 +851,8 @@ label:captionEl.textContent.trim()})})
 if(!hltbUrl){
 const anyHltbLink=doc.querySelector('a[href*="howlongtobeat.com"]')
 ;anyHltbLink&&(hltbUrl=anyHltbLink.getAttribute("href"))}
-return{fetchedGameTitle:fetchedGameTitle,ignScore:ignScore,
+return hltbUrl&&!/\/game\//i.test(hltbUrl)&&(hltbUrl=""),{
+fetchedGameTitle:fetchedGameTitle,ignScore:ignScore,
 userScore:userScore,developerName:developerName,
 publisherName:publisherName,esrbImgSrc:esrbImgSrc,
 esrbAlt:esrbAlt,esrbDescriptors:esrbDescriptors,
@@ -858,7 +889,7 @@ const cells=row.querySelectorAll("td")
 ;if(!label||/all\s*playstyles/i.test(label))return
 ;const time=cells[colIndex].textContent.trim()
 ;time&&results.push({label:label,time:time})}),results}
-NS.HLTB_SOURCE_OVERRIDES={
+NS.IGN_SOURCE_OVERRIDES={
 "final fantasy vii remake intergrade":"https://www.ign.com/games/final-fantasy-vii-remake"
 },NS.HLTB_DIRECT_URL_OVERRIDES={
 "ninja gaiden 3: razor's edge":"https://howlongtobeat.com/game/6623",
@@ -927,7 +958,7 @@ reviewGradingBadge:p.reviewGradingBadge,
 reviewSummaryText:p.reviewSummaryText,reviewUrl:p.reviewUrl
 })
 ;NS.state.isFetching=!1,attachLeisureSection(resolvedHltbUrl)
-},lookupKey=gameTitle.toLowerCase().trim(),userOverride=NS.getUserOverrideForTitle(gameTitle),directHltbUrl=userOverride&&userOverride.hltbUrl||NS.HLTB_DIRECT_URL_OVERRIDES[lookupKey],overrideUrl=NS.HLTB_SOURCE_OVERRIDES[lookupKey]
+},lookupKey=gameTitle.toLowerCase().trim(),userOverride=NS.getUserOverrideForTitle(gameTitle),directHltbUrl=userOverride&&userOverride.hltbUrl||NS.HLTB_DIRECT_URL_OVERRIDES[lookupKey],overrideUrl=NS.IGN_SOURCE_OVERRIDES[lookupKey]
 ;directHltbUrl?NS.fetchHltbDirect(directHltbUrl,r=>finishRender(r.hltbData,r.hltbUrl)):overrideUrl?NS.fetchHltbOverride(overrideUrl,r=>finishRender(r.hltbData,r.hltbUrl)):finishRender(p.hltbData,p.hltbUrl)
 }function ignSearchFallbackUrl(title){
 return`https://www.ign.com/search?q=${title.trim()}`}

@@ -93,7 +93,7 @@
         const lookupKey = gameTitle.toLowerCase().trim();
         const userOverride = NS.getUserOverrideForTitle(gameTitle);
         const directHltbUrl = (userOverride && userOverride.hltbUrl) || NS.HLTB_DIRECT_URL_OVERRIDES[lookupKey];
-        const overrideUrl = NS.HLTB_SOURCE_OVERRIDES[lookupKey];
+        const overrideUrl = NS.IGN_SOURCE_OVERRIDES[lookupKey];
         if (directHltbUrl) NS.fetchHltbDirect(directHltbUrl, r => finishRender(r.hltbData, r.hltbUrl));
         else if (overrideUrl) NS.fetchHltbOverride(overrideUrl, r => finishRender(r.hltbData, r.hltbUrl));
         else finishRender(p.hltbData, p.hltbUrl);

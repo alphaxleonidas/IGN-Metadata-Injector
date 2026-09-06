@@ -1,6 +1,6 @@
 (function (NS) {
     "use strict";
-    NS.HLTB_SOURCE_OVERRIDES = { "final fantasy vii remake intergrade": "https://www.ign.com/games/final-fantasy-vii-remake" };
+    NS.IGN_SOURCE_OVERRIDES = { "final fantasy vii remake intergrade": "https://www.ign.com/games/final-fantasy-vii-remake" };
     NS.HLTB_DIRECT_URL_OVERRIDES = {
         "ninja gaiden 3: razor's edge": "https://howlongtobeat.com/game/6623",
         "ninja gaiden 3: razor's edge [ninja gaiden: master collection]": "https://howlongtobeat.com/game/6623",

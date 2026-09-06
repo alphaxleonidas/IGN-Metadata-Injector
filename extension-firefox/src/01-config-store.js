@@ -5,16 +5,26 @@
         showReview: "Show Review Summary", showSteamReviews: "Show Steam Reviews",
         showAward: "Show IGN Award / Leaderboard", showEsrb: "Show ESRB Rating & Descriptors", showDeveloper: "Show Developer",
         showPublisher: "Show Publisher", showGenres: "Show Genres", showPlatforms: "Show Platforms", showFeatures: "Show Features",
-        showDescription: "Show Game Description", showHltb: "Show HowLongToBeat", showLeisure: "Show HLTB Leisure Times"
+        showDescription: "Show Game Description", showHltb: "Show HowLongToBeat", showLeisure: "Show HLTB Leisure Times",
+        showHltbSearchFallback: "Search HowLongToBeat Link When No Data Found"
     };
     const CONFIG_DEFAULTS = {
         showIgnScore: true, showUserRating: true, showReviewGrading: true, showReview: true, showSteamReviews: true, showAward: true,
         showEsrb: true, showDeveloper: false, showPublisher: false, showGenres: true, showPlatforms: true, showFeatures: false,
-        showDescription: true, showHltb: true, showLeisure: true
+        showDescription: true, showHltb: true, showLeisure: true, showHltbSearchFallback: true
     };
     NS.CONFIG_KEYS = CONFIG_KEYS;
     NS.CONFIG_DEFAULTS = CONFIG_DEFAULTS;
-    NS.getConfig = key => NS.storage.getSync(key, CONFIG_DEFAULTS[key]);
+    NS.PLATFORMS = ["Steam", "Epic"];
+    function currentPlatform() { return NS.IS_STEAM ? "Steam" : NS.IS_EPIC ? "Epic" : ""; }
+    // "Show ..." toggles are stored per-platform (same pattern as badgePosition below) so Steam and
+    // Epic can have entirely different visible sections when NOT using shared settings. Reading
+    // always resolves through the current page's own platform; "shared" is enforced at write time
+    // (see NS.getSettingsShared() below) by writing the same value to both platforms' keys, so
+    // reading either one back gives the same answer regardless of which is currently open.
+    NS.getConfigFor = (key, platform) => NS.storage.getSync(key + platform, CONFIG_DEFAULTS[key]);
+    NS.setConfigFor = (key, platform, value) => NS.storage.set(key + platform, value);
+    NS.getConfig = key => NS.getConfigFor(key, currentPlatform());
     const SECTION_LABELS = {
         scores: "IGN Score / User Rating", reviewGrading: "Review Grading", review: "Review Summary", steamReviews: "Steam Reviews", award: "Leaderboard Rank",
         esrb: "ESRB Rating", developer: "Developer", publisher: "Publisher", genres: "Genres", platforms: "Platforms", features: "Features", description: "Game Description",
@@ -35,13 +45,18 @@
     NS.SECTION_LABELS = SECTION_LABELS;
     NS.SECTION_CONFIG_KEYS = SECTION_CONFIG_KEYS;
     NS.DEFAULT_SECTION_ORDER = DEFAULT_SECTION_ORDER;
-    NS.getSectionOrder = function getSectionOrder() {
-        const stored = NS.storage.getSync("sectionOrder", null);
+    NS.getSectionOrderFor = function getSectionOrderFor(platform) {
+        const stored = NS.storage.getSync("sectionOrder" + platform, null);
         if (!Array.isArray(stored) || stored.length === 0) return [ ...DEFAULT_SECTION_ORDER ];
         const known = stored.filter(key => DEFAULT_SECTION_ORDER.includes(key));
         return [ ...known, ...DEFAULT_SECTION_ORDER.filter(key => !known.includes(key)) ];
     };
-    NS.setSectionOrder = order => NS.storage.set("sectionOrder", order);
+    NS.setSectionOrderFor = (platform, order) => NS.storage.set("sectionOrder" + platform, order);
+    NS.getSectionOrder = () => NS.getSectionOrderFor(currentPlatform());
+    NS.setSectionOrder = order => NS.setSectionOrderFor(currentPlatform(), order);
+    // Position/location settings are per-platform (Steam vs Epic); getBadgePosition/getSectionLocation
+    // resolve to the current page's platform, the ...For() variants take an explicit platform name so
+    // the settings UI can edit both regardless of which site is currently open.
     NS.BADGE_POSITION_OPTIONS = [
         { value: "default", label: "Default" }, { value: "aboveTitle", label: "Above Game Title" },
         { value: "belowGameMedia", label: "Below Game Media" },
@@ -51,11 +66,6 @@
         { value: "belowRightSidebarMetadata", label: "Below Right Side Metadata" },
         { value: "sidebarBottom", label: "Bottom of Right Sidebar" }
     ];
-    // Position/location settings are per-platform (Steam vs Epic); getBadgePosition/getSectionLocation
-    // resolve to the current page's platform, the ...For() variants take an explicit platform name so
-    // the settings UI can edit both regardless of which site is currently open.
-    NS.PLATFORMS = ["Steam", "Epic"];
-    function currentPlatform() { return NS.IS_STEAM ? "Steam" : NS.IS_EPIC ? "Epic" : ""; }
     NS.getBadgePositionFor = platform => NS.storage.getSync("badgePosition" + platform, "default");
     NS.setBadgePositionFor = (platform, value) => NS.storage.set("badgePosition" + platform, value);
     NS.getBadgePosition = () => NS.getBadgePositionFor(currentPlatform());
@@ -64,12 +74,17 @@
     NS.getSiteEnabled = platform => NS.storage.getSync("enabled" + platform, true);
     NS.setSiteEnabled = (platform, value) => NS.storage.set("enabled" + platform, value);
     NS.isEnabledForCurrentSite = () => NS.getSiteEnabled(currentPlatform());
-    // Placement sharing: on writes one set of placement controls to both platforms; off gives each
-    // enabled site its own column. getVisiblePlatforms() is what the settings UI renders columns for.
-    NS.getPlacementShared = () => NS.storage.getSync("placementShared", false);
-    NS.setPlacementShared = value => NS.storage.set("placementShared", value);
+    // Whether Steam and Epic use one shared configuration or each get their own: governs Visible
+    // Sections, Section Order, Separate Entry/Location, Overlay Position, and Combine All. When on,
+    // Save writes the same value to both platforms' storage keys; when off, each platform keeps its
+    // own independent copy (edited via the settings panel's Steam/Epic pager). Per-title IGN/HLTB
+    // overrides are NOT part of this — they're global by nature, not platform-specific, and are
+    // unaffected either way. (Storage key kept as "placementShared" from before this setting's scope
+    // broadened, to avoid resetting anyone's already-saved preference.)
+    NS.getSettingsShared = () => NS.storage.getSync("placementShared", false);
+    NS.setSettingsShared = value => NS.storage.set("placementShared", value);
     NS.getEnabledPlatforms = () => NS.PLATFORMS.filter(p => NS.getSiteEnabled(p));
-    NS.getVisiblePlatforms = () => { const enabled = NS.getEnabledPlatforms(); return NS.getPlacementShared() ? enabled.slice(0, 1) : enabled; };
+    NS.getVisiblePlatforms = () => { const enabled = NS.getEnabledPlatforms(); return NS.getSettingsShared() ? enabled.slice(0, 1) : enabled; };
     // Independent placement for HLTB / Leisure: 'inline' (default, inside the main badge) or any of
     // the positions above, rendered as their own element.
     NS.LOCATION_OPTIONS = [{ value: "inline", label: "Inline (Default)" }, ...NS.BADGE_POSITION_OPTIONS];
@@ -121,5 +136,11 @@
             menuCommandIds[key] = GM_registerMenuCommand(menuLabel(key), () => NS.toggleConfig(key));
         }
     };
-    NS.toggleConfig = function toggleConfig(key) { NS.storage.set(key, !NS.getConfig(key)); NS.registerMenuCommands(); };
+    NS.toggleConfig = function toggleConfig(key) {
+        const platform = currentPlatform();
+        const newValue = !NS.getConfigFor(key, platform);
+        const targets = NS.getSettingsShared() ? NS.PLATFORMS : [platform];
+        targets.forEach(p => NS.setConfigFor(key, p, newValue));
+        NS.registerMenuCommands();
+    };
 })(window.IGN_METADATA_INJECTOR = window.IGN_METADATA_INJECTOR || {});

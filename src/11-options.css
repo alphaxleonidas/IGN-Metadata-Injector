@@ -46,3 +46,7 @@ section { margin-bottom: 24px; }
 #save_status { font-size: 12px; color: #66c0f4; opacity: 0; transition: opacity 0.2s; }
 #save_status.visible { opacity: 1; }
 #save { border: none; border-radius: 6px; padding: 10px 22px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; background: #ff3e3e; color: #ffffff; }
+.platform_pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 12px 0 4px; }
+.pager_arrow { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #c6d4df; border-radius: 6px; width: 34px; height: 34px; font-size: 18px; line-height: 1; cursor: pointer; }
+.pager_arrow:hover { background: rgba(255,255,255,0.12); color: #ffffff; }
+.pager_label { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; color: #ffffff; min-width: 100px; text-align: center; }

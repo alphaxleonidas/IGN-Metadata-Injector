@@ -89,9 +89,27 @@
         return `<div style="${sectionRow("display:flex;flex-direction:column;gap:4px;")}"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><span style="color:#a1b0bd;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Review Summary:</span>${link}</div><span style="font-size:13px;line-height:1.55;color:#e4e9ee;">${NS.escapeHtml(reviewSummary)}</span></div>`;
     }
     function buildHltbRow(hltbData, hltbUrl) {
-        if (!NS.getConfig("showHltb") || !(hltbData && hltbData.length > 0)) return "";
-        const displayData = hltbData.filter(item => !/all styles/i.test(item.label));
-        return displayData.length === 0 ? "" : hltbSectionHtml("HowLongToBeat", "#66c0f4", displayData, hltbUrl);
+        if (!NS.getConfig("showHltb")) return "";
+        const displayData = (hltbData || []).filter(item => !/all styles/i.test(item.label));
+        if (displayData.length > 0) return hltbSectionHtml("HowLongToBeat", "#66c0f4", displayData, hltbUrl);
+        // IGN's page had no embedded HLTB widget (or it parsed to nothing) -
+        // offer a direct search link instead of showing nothing at all.
+        // hltbUrl is always populated by this point (resolveHltbUrl() below
+        // already falls back to a howlongtobeat.com search-query URL when
+        // there's no real page-sourced link), so this is always actionable.
+        if (!NS.getConfig("showHltbSearchFallback")) return "";
+        return buildHltbSearchFallbackHtml(hltbUrl);
+    }
+    function buildHltbSearchFallbackHtml(hltbUrl) {
+        if (!hltbUrl) return "";
+        // hltbUrl here is either a real, specific HowLongToBeat page (a per-title override, or a
+        // /game/<id> link IGN's own page linked to) that simply had no parseable time-table on it,
+        // or the generic constructed https://howlongtobeat.com/?q=<name> search query used when no
+        // specific page is known at all. Labeling both cases identically as "Search on..." made a
+        // working override look like it was being ignored - the label now reflects which one it is.
+        const isSpecificLink = /\/game\//i.test(hltbUrl);
+        const label = isSpecificLink ? "View on HowLongToBeat" : "Search on HowLongToBeat";
+        return `<div style="${sectionRow("display:flex;align-items:center;justify-content:space-between;")}"><a href="${hltbUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:#66c0f4;font-weight:bold;text-decoration:none;text-transform:uppercase;letter-spacing:0.3px;">${label} ↗</a>${gearButtonHtml()}</div>`;
     }
     NS.buildLeisureRow = (leisureData, hltbUrl) =>
         (!NS.getConfig("showLeisure") || !leisureData || leisureData.length === 0) ? "" : hltbSectionHtml("HLTB Leisure Time", "#9b59b6", leisureData, hltbUrl);
@@ -99,7 +117,7 @@
     // stat blocks stay plain — plus a settings gear beside it.
     function hltbSectionHtml(title, color, data, hltbUrl) {
         const items = data.map(item => statBlock(item.time, NS.relabelHltb(item.label), "16px", color, "10px")).join(divider("26px"));
-        return `<div style="${sectionRow("display:flex;flex-direction:column;gap:8px;")}"><div style="display:flex;align-items:center;justify-content:space-between;"><a href="${encodeURI(hltbUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:10px;color:${color};text-transform:uppercase;font-weight:bold;text-decoration:none;">${title} ↗</a>${gearButtonHtml()}</div><div style="display:flex;align-items:center;justify-content:space-around;background:rgba(0,0,0,0.4);padding:8px 4px;border-radius:4px;">${items}</div></div>`;
+        return `<div style="${sectionRow("display:flex;flex-direction:column;gap:8px;")}"><div style="display:flex;align-items:center;justify-content:space-between;"><a href="${hltbUrl}" target="_blank" rel="noopener noreferrer" style="font-size:10px;color:${color};text-transform:uppercase;font-weight:bold;text-decoration:none;">${title} ↗</a>${gearButtonHtml()}</div><div style="display:flex;align-items:center;justify-content:space-around;background:rgba(0,0,0,0.4);padding:8px 4px;border-radius:4px;">${items}</div></div>`;
     }
     const resolveHltbUrl = (hltbUrl, displayName) => hltbUrl || `https://howlongtobeat.com/?q=${encodeURIComponent(displayName)}`;
     function insertAtTarget(node, targetObj) {

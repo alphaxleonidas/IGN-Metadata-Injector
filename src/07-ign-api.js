@@ -18,7 +18,29 @@
     // Edition/version qualifiers add noise that dilutes comparison without
     // helping distinguish one game from another.
     const EDITION_NOISE_RE =
-        /\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|director's cut|anniversary)\s*(edition)?\b/gi;
+        /\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|director's cut|anniversary|special)\s*(edition)?\b/gi;
+    // Non-global copy for repeated .test() calls - a 'g' flag regex keeps
+    // .lastIndex state between calls, which would silently break every other
+    // check if reused as-is.
+    const EDITION_QUALIFIER_TEST_RE = new RegExp(EDITION_NOISE_RE.source, "i");
+    // IGN sometimes has a separate page for "Deluxe"/"Ultimate"/"Special"
+    // editions alongside the plain game - both can match the store title
+    // equally well once edition words are stripped for comparison, so without
+    // this they'd tie and the choice would come down to arbitrary search-API
+    // ordering. The plain/regular-edition page is what actually holds the
+    // fullest info (review, description, genres, etc.), so it's ALWAYS
+    // preferred over an edition-suffixed page, even when the store's own
+    // listing is itself for that edition: a fixed penalty applied to any
+    // candidate whose own (raw, un-stripped) name carries an edition
+    // qualifier. This must outweigh the maximum possible combined swing from
+    // YEAR_MATCH_BONUS + YEAR_MISMATCH_PENALTY below (0.30) - otherwise a
+    // store listing whose shown release date happens to match the edition's
+    // own (often later) release date rather than the base game's original
+    // one could out-score the edition penalty and win anyway, which
+    // defeated the very first version of this fix. It's still small enough
+    // that if IGN only has an edition-suffixed page for a given game, that
+    // candidate easily clears MIN_MATCH_SCORE after the penalty.
+    const EDITION_CANDIDATE_PENALTY = 0.35;
 
     // Words too generic to count as evidence of a match either way.
     const STOPWORDS = new Set(["the", "a", "an", "of", "and", "edition"]);
@@ -190,7 +212,8 @@
             results.forEach(obj => {
                 const name = getGameName(obj);
                 if (!name || !obj.slug) return;
-                const score = scoreCandidate(targetTokens, significantTokens(name), storeYear, obj);
+                let score = scoreCandidate(targetTokens, significantTokens(name), storeYear, obj);
+                if (score >= 0 && EDITION_QUALIFIER_TEST_RE.test(name)) score -= EDITION_CANDIDATE_PENALTY;
                 if (score > bestScore) { bestScore = score; best = obj; }
             });
             if (!best || bestScore < MIN_MATCH_SCORE) return callback(null);
@@ -333,6 +356,14 @@
             if (hltbLinkEl) hltbUrl = hltbLinkEl.getAttribute("href");
         }
         if (!hltbUrl) { const anyHltbLink = doc.querySelector('a[href*="howlongtobeat.com"]'); if (anyHltbLink) hltbUrl = anyHltbLink.getAttribute("href"); }
+        // IGN links to HowLongToBeat's bare homepage (no specific /game/<id> path) when it couldn't
+        // identify a matching HLTB entry for this game - most commonly for edition-suffixed titles
+        // HLTB doesn't have a separate listing for. That link isn't actually useful (it doesn't
+        // search or point at anything specific), so it's treated the same as "no HLTB link found"
+        // rather than used verbatim - otherwise downstream code (resolveHltbUrl() in
+        // 05-badge-render.js) sees this as a real link and never builds the proper search-query
+        // fallback URL, showing a dead-end bare "https://howlongtobeat.com/" link instead.
+        if (hltbUrl && !/\/game\//i.test(hltbUrl)) hltbUrl = "";
         return {
             fetchedGameTitle, ignScore, userScore, developerName, publisherName, esrbImgSrc, esrbAlt, esrbDescriptors, awardData, hltbData, hltbUrl,
             description, genres, features, platforms, reviewGradingText, reviewGradingBadge, reviewSummaryText, reviewUrl

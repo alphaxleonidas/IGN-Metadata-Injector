@@ -21,7 +21,22 @@
             .ign_override_pill { font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; color: #ff3e3e; border: 1px solid rgba(255,62,62,0.5); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; } .ign_override_pill_hltb { color: #66c0f4; border-color: rgba(102,192,244,0.5); } .ign_override_remove { background: transparent; border: none; color: #8f98a0; cursor: pointer; font-size: 13px; padding: 2px 6px; flex-shrink: 0; } .ign_override_remove:hover { color: #ff3e3e; }
             .ign_override_empty { font-size: 11px; color: #8f98a0; margin: 0 0 10px; } .ign_override_form { display: flex; flex-direction: column; gap: 6px; } .ign_override_form input { background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; }
             .ign_override_form button { align-self: flex-end; border: none; border-radius: 6px; padding: 7px 14px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; background: rgba(102,192,244,0.15); color: #66c0f4; }
+            .ign_platform_pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 10px 0 4px; }
+            .ign_pager_arrow { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #c6d4df; border-radius: 6px; width: 30px; height: 30px; font-size: 16px; line-height: 1; cursor: pointer; }
+            .ign_pager_arrow:hover { background: rgba(255,255,255,0.12); color: #ffffff; }
+            .ign_pager_label { font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; color: #ffffff; min-width: 90px; text-align: center; }
         </style>`;
+    // Which platform's settings are currently shown when NOT using shared settings.
+    // Persists only for this page's lifetime - reopening the panel fresh (e.g. after
+    // a full page reload) always starts back on the current page's own platform.
+    let pagerPlatform = null;
+    function getEffectivePlatform() {
+        const enabled = NS.getEnabledPlatforms();
+        if (enabled.length === 0) return NS.PLATFORMS[0];
+        if (NS.getSettingsShared() || enabled.length === 1) return enabled[0];
+        if (!pagerPlatform || !enabled.includes(pagerPlatform)) pagerPlatform = enabled[0];
+        return pagerPlatform;
+    }
     function wireDragReorder(listEl) {
         let draggedItem = null;
         listEl.querySelectorAll(".ign_order_item").forEach(item => {
@@ -36,69 +51,64 @@
             });
         });
     }
-    // Any Location shared by 2+ currently-separate sections (on a given platform) gets combined into
-    // one standalone element instead of independent ones — the same "combine when sharing a
-    // location" behavior HLTB/Leisure Time originally had on their own, now generalized to every
-    // section (see placeSimpleSections() in 05-badge-render.js). Their relative order within a
-    // combined group is just their relative order in the Section Order list above, so this reads
-    // live (unsaved) select values + the live Section Order to show an informational note rather
-    // than offering a second, separate drag-to-reorder control.
-    function computeSharedLocationGroups(overlay, platform) {
+    // Any Location shared by 2+ currently-separate sections (on the current effective
+    // platform) gets combined into one standalone element instead of independent ones
+    // (see placeSections() in 05-badge-render.js). Their relative order within a
+    // combined group is just their relative order in the Section Order list above, so
+    // this reads live (unsaved) select values + the live Section Order to show an
+    // informational note rather than offering a second, separate drag-to-reorder control.
+    function computeSharedLocationGroups(overlay) {
         const byLoc = {};
-        overlay.querySelectorAll(`[data-key-location-block] select[data-platform="${platform}"]`).forEach(sel => {
+        overlay.querySelectorAll(`[data-key-location-block] select`).forEach(sel => {
             (byLoc[sel.value] = byLoc[sel.value] || []).push(sel.dataset.key);
         });
         return Object.keys(byLoc).filter(loc => loc !== "inline" && byLoc[loc].length > 1).map(loc => ({ loc, keys: byLoc[loc] }));
     }
     function buildSettingsPanelHtml() {
+        const platform = getEffectivePlatform();
+        const shared = NS.getSettingsShared();
+        const enabledPlatforms = NS.getEnabledPlatforms();
+        const showPager = !shared && enabledPlatforms.length > 1;
         const enableRows = NS.PLATFORMS.map(p =>
             `<label class="ign_settings_toggle_row"><span>Enable on ${p}</span><span class="ign_switch"><input type="checkbox" data-site-enable="${p}" ${NS.getSiteEnabled(p) ? "checked" : ""}><span class="ign_switch_slider"></span></span></label>`).join("");
-        const shared = NS.getPlacementShared();
-        const placementPlatforms = NS.getVisiblePlatforms();
         // "Separate" (i.e. rendered as its own standalone element instead of folded inline into the
-        // main badge) is stored per-platform via the same Location value every section already has
-        // (getSectionLocationFor(key, platform) !== "inline"). The checkbox reflects/drives that on
-        // whichever platform(s) are currently visible for editing; a key counts as checked if it's
-        // separate on any of them, since the row itself has no per-platform breakdown.
-        const separatePlatforms = placementPlatforms.length ? placementPlatforms : NS.PLATFORMS;
-        const isKeySeparate = key => separatePlatforms.some(p => NS.getSectionLocationFor(key, p) !== "inline");
+        // main badge) is the same per-platform Location value every section already has
+        // (getSectionLocationFor(key, platform) !== "inline"), read for the current effective platform.
+        const isKeySeparate = key => NS.getSectionLocationFor(key, platform) !== "inline";
         // "Visible" folds the old standalone "Visible Sections" toggle list into this same row — a
         // section's underlying "Show ..." config key(s) (see NS.SECTION_CONFIG_KEYS; almost always
         // one, except "scores" which is really two independently-toggleable configs sharing one row).
-        // Checked if any of them are currently on; (un)checking it writes that same state to all of
-        // them on Save.
-        const isKeyVisible = key => (NS.SECTION_CONFIG_KEYS[key] || []).some(ck => NS.getConfig(ck));
-        const orderRows = NS.getSectionOrder().map(key =>
+        // Checked if any of them are currently on for the current effective platform; (un)checking
+        // it writes that same state to all of them (and to both platforms if shared) on Save.
+        const isKeyVisible = key => (NS.SECTION_CONFIG_KEYS[key] || []).some(ck => NS.getConfigFor(ck, platform));
+        const orderRows = NS.getSectionOrderFor(platform).map(key =>
             `<li class="ign_order_item" draggable="true" data-key="${key}">` +
             `<label class="ign_separate_checkbox_wrap"><input type="checkbox" class="ign_separate_checkbox" data-key="${key}" ${isKeySeparate(key) ? "checked" : ""}></label>` +
             `<span class="ign_order_handle">⠿</span><span style="flex:1;">${NS.escapeHtml(NS.SECTION_LABELS[key] || key)}</span>` +
             `<label class="ign_switch"><input type="checkbox" class="ign_visible_checkbox" data-key="${key}" ${isKeyVisible(key) ? "checked" : ""}><span class="ign_switch_slider"></span></label></li>`).join("");
-        const combineAllChecked = separatePlatforms.some(p => NS.getCombineAllFor(p));
-        // When placement is shared between Steam and Epic there's only one column to edit, so it's
-        // omitted per-select rather than repeated under every single dropdown (each block's
-        // heading already names the section, so nothing is lost).
-        const platformLabelHtml = platform => shared ? "" : `<label style="display:block;font-size:10px;color:#a1b0bd;text-transform:uppercase;font-weight:bold;margin-bottom:5px;">${platform}</label>`;
-        const positionSelect = platform => {
+        const combineAllChecked = NS.getCombineAllFor(platform);
+        const positionSelect = () => {
             const current = NS.getBadgePositionFor(platform);
             const opts = NS.BADGE_POSITION_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === current ? "selected" : ""}>${NS.escapeHtml(opt.label)}</option>`).join("");
-            return `<div>${platformLabelHtml(platform)}<select id="ign_badge_position_${platform}" class="ign_settings_select">${opts}</select></div>`;
+            return `<div><select id="ign_badge_position_${platform}" class="ign_settings_select">${opts}</select></div>`;
         };
-        const locationSelect = (key, platform) => {
+        const locationSelect = key => {
             const current = NS.getSectionLocationFor(key, platform);
             const opts = NS.LOCATION_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === current ? "selected" : ""}>${NS.escapeHtml(opt.label)}</option>`).join("");
-            return `<div>${platformLabelHtml(platform)}<select id="ign_${key}_location_${platform}" class="ign_settings_select" data-key="${key}" data-platform="${platform}">${opts}</select></div>`;
+            return `<div><select id="ign_${key}_location_${platform}" class="ign_settings_select" data-key="${key}">${opts}</select></div>`;
         };
-        const combineLocationSelect = platform => {
+        const combineLocationSelect = () => {
             const current = NS.getCombineLocationFor(platform);
             const opts = NS.LOCATION_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === current ? "selected" : ""}>${NS.escapeHtml(opt.label)}</option>`).join("");
-            return `<div>${platformLabelHtml(platform)}<select id="ign_combine_location_${platform}" class="ign_settings_select">${opts}</select></div>`;
+            return `<div><select id="ign_combine_location_${platform}" class="ign_settings_select">${opts}</select></div>`;
         };
-        // One block per section currently checked as "Separate Entry" — a Location select per
-        // visible platform, keyed off the same generic getSectionLocationFor(key, platform) storage
-        // HLTB/Leisure already used. Rebuilt whenever the checkbox column changes (see openSettingsPanel).
-        const keyLocationBlockHtml = (key, platforms) => {
+        // One block per section currently checked as "Separate Entry" — a single Location select
+        // for the current effective platform, keyed off the same generic
+        // getSectionLocationFor(key, platform) storage HLTB/Leisure already used. Rebuilt whenever
+        // the checkbox column changes (see openSettingsPanel).
+        const keyLocationBlockHtml = key => {
             const heading = NS.SECTION_LABELS[key] || key;
-            return `<div class="ign_key_location_block" data-key-location-block="${key}"><h3>${NS.escapeHtml(heading)}</h3><div class="ign_locations_row">${platforms.map(p => locationSelect(key, p)).join("")}</div></div>`;
+            return `<div class="ign_key_location_block" data-key-location-block="${key}"><h3>${NS.escapeHtml(heading)}</h3><div class="ign_locations_row">${locationSelect(key)}</div></div>`;
         };
         const userOverrides = NS.getUserOverrides();
         const overrideKeys = Object.keys(userOverrides);
@@ -109,10 +119,21 @@
         }).join("");
         return `
             ${SETTINGS_PANEL_STYLE}
-            <div id="ign_settings_overlay">
+            <div id="ign_settings_overlay" data-ign-platform="${platform}">
                 <div id="ign_settings_panel">
                     <h2>IGN Script Settings</h2>
                     <p class="ign_settings_sub">Changes apply immediately on save — no page refresh needed.</p>
+                    <div style="margin-bottom:14px;">
+                        <label class="ign_settings_toggle_row" style="border-bottom:none;">
+                            <span>Use the same settings for Steam and Epic</span>
+                            <span class="ign_switch"><input type="checkbox" id="ign_placement_shared" ${shared ? "checked" : ""}><span class="ign_switch_slider"></span></span>
+                        </label>
+                        <div class="ign_platform_pager" style="${showPager ? "" : "display:none;"}">
+                            <button type="button" id="ign_pager_prev" class="ign_pager_arrow" aria-label="Previous platform">‹</button>
+                            <span class="ign_pager_label">${NS.escapeHtml(platform)} Settings</span>
+                            <button type="button" id="ign_pager_next" class="ign_pager_arrow" aria-label="Next platform">›</button>
+                        </div>
+                    </div>
                     <div class="ign_settings_columns">
                         <div>
                             <div class="ign_order_list_header"><span class="ign_separate_col_label">Separate Entry</span><h3>Section Order (drag to reorder)</h3><span class="ign_visible_col_label">Visible</span></div>
@@ -122,24 +143,21 @@
                                     <span>Combine all entries in one place</span>
                                     <span class="ign_switch"><input type="checkbox" id="ign_combine_all" ${combineAllChecked ? "checked" : ""}><span class="ign_switch_slider"></span></span>
                                 </label>
-                                <div id="ign_combine_all_locations" class="ign_locations_row" style="margin-top:8px;${combineAllChecked ? "" : "display:none;"}">${placementPlatforms.map(combineLocationSelect).join("")}</div>
+                                <div id="ign_combine_all_locations" class="ign_locations_row" style="margin-top:8px;${combineAllChecked ? "" : "display:none;"}">${combineLocationSelect()}</div>
                             </div>
+                            <label class="ign_settings_toggle_row" style="border-bottom:none;margin-top:4px;">
+                                <span>Search HowLongToBeat link when no data found</span>
+                                <span class="ign_switch"><input type="checkbox" id="ign_hltb_search_fallback" ${NS.getConfigFor("showHltbSearchFallback", platform) ? "checked" : ""}><span class="ign_switch_slider"></span></span>
+                            </label>
                         </div>
                     </div>
                     <div style="margin-top:18px;"><h3>Enable / Disable Per Site</h3>${enableRows}</div>
-                    <div style="margin-top:18px;">
-                        <label class="ign_settings_toggle_row" style="border-bottom:none;">
-                            <span>Share the same placement for Steam and Epic</span>
-                            <span class="ign_switch"><input type="checkbox" id="ign_placement_shared" ${shared ? "checked" : ""}><span class="ign_switch_slider"></span></span>
-                        </label>
-                    </div>
-                    ${placementPlatforms.length === 0 ? '<p class="ign_settings_sub">Enable at least one site above to configure placement.</p>' : `
-                    <div style="margin-top:10px;"><h3 id="ign_overlay_position_heading">Overlay Position</h3><div class="ign_locations_row">${placementPlatforms.map(positionSelect).join("")}</div></div>
-                    <div id="ign_key_locations_wrap" style="${combineAllChecked ? "display:none;" : ""}">${NS.getSectionOrder().filter(isKeySeparate).map(key => keyLocationBlockHtml(key, placementPlatforms)).join("")}</div>
-                    <div id="ign_shared_location_notes" style="${combineAllChecked ? "display:none;" : ""}"></div>`}
+                    <div style="margin-top:10px;"><h3 id="ign_overlay_position_heading">Overlay Position</h3><div class="ign_locations_row">${positionSelect()}</div></div>
+                    <div id="ign_key_locations_wrap" style="${combineAllChecked ? "display:none;" : ""}">${NS.getSectionOrderFor(platform).filter(isKeySeparate).map(keyLocationBlockHtml).join("")}</div>
+                    <div id="ign_shared_location_notes" style="${combineAllChecked ? "display:none;" : ""}"></div>
                     <div style="margin-top:18px;">
                         <h3>Per-Title Overrides</h3>
-                        <p class="ign_settings_sub" style="margin-bottom:8px;">Add/Override IGN/HowLongToBeat data. Useful when no data is found.</p>
+                        <p class="ign_settings_sub" style="margin-bottom:8px;">Add/Override IGN/HowLongToBeat data. Useful when no data is found. Shared between Steam and Epic.</p>
                         ${overrideKeys.length === 0 ? '<p class="ign_override_empty">No overrides added yet.</p>' : `<ul id="ign_override_list">${overrideRowsHtml}</ul>`}
                         <div class="ign_override_form">
                             <input type="text" id="ign_override_title" placeholder="Game title, exactly as shown on the store page">
@@ -157,34 +175,36 @@
         document.querySelector(".ign_rating_row")?.remove();
         NS.init();
     }
-    // Reopening the panel (placement-shared toggle, site-enable toggle, adding/removing an override)
-    // used to always rebuild from storage, silently discarding any not-yet-Saved edits made elsewhere
-    // in the panel first — e.g. unchecking Leisure Time's Visible switch, then flipping "Share the
-    // same placement", would forget the Visible change. These two capture/reapply the panel's live,
-    // unsaved state across such a reopen; a genuinely fresh open (no previous overlay) is unaffected
-    // since there's nothing to snapshot.
-    function snapshotPanelState(overlay, list) {
+    // Reopening the panel (site-enable toggle, adding/removing an override) used to always rebuild
+    // from storage, silently discarding any not-yet-Saved edits made elsewhere in the panel first.
+    // This captures/reapplies the panel's live, unsaved state across such a reopen — but only when
+    // reopening for the SAME platform as before; switching platforms via the pager (or toggling
+    // "shared", which changes which platform is effectively being edited) intentionally shows that
+    // platform's own saved state fresh rather than carrying over unrelated edits across platforms.
+    function snapshotPanelState(overlay, list, platform) {
         if (!overlay || !list) return null;
         const mapChecked = sel => Array.from(overlay.querySelectorAll(sel)).reduce((m, el) => { m[el.dataset.key] = el.checked; return m; }, {});
         const mapValues = sel => Array.from(overlay.querySelectorAll(sel)).reduce((m, el) => { m[el.id] = el.value; return m; }, {});
         return {
+            platform,
             order: Array.from(list.querySelectorAll(".ign_order_item")).map(li => li.dataset.key),
             visible: mapChecked(".ign_visible_checkbox"),
             separate: mapChecked(".ign_separate_checkbox"),
             combineAll: overlay.querySelector("#ign_combine_all") ? overlay.querySelector("#ign_combine_all").checked : null,
+            hltbSearchFallback: overlay.querySelector("#ign_hltb_search_fallback") ? overlay.querySelector("#ign_hltb_search_fallback").checked : null,
             locationSelects: mapValues("[data-key-location-block] select"),
             combineLocationSelects: mapValues('[id^="ign_combine_location_"]'),
             positionSelects: mapValues('[id^="ign_badge_position_"]')
         };
     }
-    function applyPanelSnapshot(overlay, list, snap) {
-        if (!snap) return;
+    function applyPanelSnapshot(overlay, list, snap, platform) {
+        if (!snap || snap.platform !== platform) return;
         snap.order.forEach(key => { const li = list.querySelector(`.ign_order_item[data-key="${key}"]`); if (li) list.appendChild(li); });
         Object.keys(snap.visible).forEach(key => { const cb = overlay.querySelector(`.ign_visible_checkbox[data-key="${key}"]`); if (cb) cb.checked = snap.visible[key]; });
         // Separate Entry checkboxes drive block creation/removal via their own change listener, so
         // only dispatch when the freshly-rebuilt (storage) value actually differs from the snapshot —
         // this both avoids redundant work and lets the listener build each block with the right
-        // platform selects before location values are restored onto them below.
+        // select before location values are restored onto it below.
         Object.keys(snap.separate).forEach(key => {
             const cb = overlay.querySelector(`.ign_separate_checkbox[data-key="${key}"]`);
             if (cb && cb.checked !== snap.separate[key]) { cb.checked = snap.separate[key]; cb.dispatchEvent(new Event("change", { bubbles: true })); }
@@ -193,16 +213,32 @@
             const cb = overlay.querySelector("#ign_combine_all");
             if (cb && cb.checked !== snap.combineAll) { cb.checked = snap.combineAll; cb.dispatchEvent(new Event("change", { bubbles: true })); }
         }
+        if (snap.hltbSearchFallback !== null) {
+            const cb = overlay.querySelector("#ign_hltb_search_fallback");
+            if (cb) cb.checked = snap.hltbSearchFallback;
+        }
         [snap.locationSelects, snap.combineLocationSelects, snap.positionSelects].forEach(map => {
             Object.keys(map).forEach(id => { const sel = overlay.querySelector("#" + id); if (sel) sel.value = map[id]; });
         });
     }
     NS.openSettingsPanel = function openSettingsPanel() {
         const prevOverlay = document.getElementById("ign_settings_overlay");
-        const snapshot = snapshotPanelState(prevOverlay, prevOverlay ? prevOverlay.querySelector("#ign_order_list") : null);
+        const prevPanelEl = prevOverlay ? prevOverlay.querySelector("#ign_settings_panel") : null;
+        // Preserve scroll position across every rebuild below — without this, toggling any setting
+        // (which reopens the panel to reflect the change) snapped the scrollable panel back to the
+        // top, which felt jarring on a long settings list.
+        const prevScrollTop = prevPanelEl ? prevPanelEl.scrollTop : 0;
+        // The platform prevOverlay actually shows — read from its own tag rather than calling
+        // getEffectivePlatform() again here, since a pager click already mutates pagerPlatform to
+        // the NEW platform before calling this function, which would otherwise make the snapshot
+        // believe it was taken from the platform we're switching TO rather than the one we're
+        // switching FROM.
+        const prevPlatform = prevOverlay ? prevOverlay.dataset.ignPlatform : null;
+        const snapshot = snapshotPanelState(prevOverlay, prevOverlay ? prevOverlay.querySelector("#ign_order_list") : null, prevPlatform);
         prevOverlay?.remove();
         document.body.insertAdjacentHTML("beforeend", buildSettingsPanelHtml());
         const overlay = document.getElementById("ign_settings_overlay");
+        const panelEl = document.getElementById("ign_settings_panel");
         const list = document.getElementById("ign_order_list");
         wireDragReorder(list);
         // Rebuilds the "shared location" info note from the live (unsaved) checkbox/select state
@@ -213,28 +249,19 @@
             const container = overlay.querySelector("#ign_shared_location_notes");
             if (!container) return;
             const order = Array.from(list.querySelectorAll(".ign_order_item")).map(li => li.dataset.key);
-            const shared = NS.getPlacementShared();
-            const sections = [];
-            NS.getVisiblePlatforms().forEach(platform => {
-                const groups = computeSharedLocationGroups(overlay, platform);
-                if (!groups.length) return;
-                const lines = groups.map(g => {
-                    const names = order.filter(k => g.keys.includes(k)).map(k => NS.escapeHtml(NS.SECTION_LABELS[k] || k)).join(" ; ");
-                    const posLabel = NS.escapeHtml((NS.LOCATION_OPTIONS.find(o => o.value === g.loc) || {}).label || g.loc);
-                    return `<strong style="color:#c6d4df;">${posLabel}</strong> : ${names}`;
-                });
-                const prefix = shared ? "" : `<strong style="color:#c6d4df;">${NS.escapeHtml(platform)}</strong><br>`;
-                sections.push(`${prefix}${lines.join("<br>")}`);
+            const groups = computeSharedLocationGroups(overlay);
+            if (!groups.length) { container.innerHTML = ""; return; }
+            const lines = groups.map(g => {
+                const names = order.filter(k => g.keys.includes(k)).map(k => NS.escapeHtml(NS.SECTION_LABELS[k] || k)).join(" ; ");
+                const posLabel = NS.escapeHtml((NS.LOCATION_OPTIONS.find(o => o.value === g.loc) || {}).label || g.loc);
+                return `<strong style="color:#c6d4df;">${posLabel}</strong> : ${names}`;
             });
-            container.innerHTML = sections.length
-                ? `<p class="ign_settings_sub" style="margin-top:10px;margin-bottom:0;"><strong style="color:#c6d4df;">Overlapping Locations:</strong><br>${sections.join("<br>")}<br><br><span style="opacity:0.8;">Drag items in Section Order above to change their combined order.</span></p>`
-                : "";
+            container.innerHTML = `<p class="ign_settings_sub" style="margin-top:10px;margin-bottom:0;"><strong style="color:#c6d4df;">Overlapping Locations:</strong><br>${lines.join("<br>")}<br><br><span style="opacity:0.8;">Drag items in Section Order above to change their combined order.</span></p>`;
         }
         syncSharedLocationNotes();
-        // "Separate Entry" checkbox column: adds/removes that section's per-platform Location
-        // select block live (unsaved) as each box is (un)checked, defaulting a freshly-checked
-        // section to DEFAULT_SEPARATE_LOCATION rather than storage (which would still read "inline"
-        // until Save).
+        // "Separate Entry" checkbox column: adds/removes that section's Location select block live
+        // (unsaved) as each box is (un)checked, defaulting a freshly-checked section to
+        // DEFAULT_SEPARATE_LOCATION rather than storage (which would still read "inline" until Save).
         const DEFAULT_SEPARATE_LOCATION = "belowGameMedia";
         overlay.querySelectorAll(".ign_separate_checkbox").forEach(checkbox => {
             checkbox.addEventListener("change", () => {
@@ -243,15 +270,11 @@
                 if (!wrap) return;
                 const existing = wrap.querySelector(`[data-key-location-block="${key}"]`);
                 if (checkbox.checked && !existing) {
-                    const platforms = NS.getVisiblePlatforms();
-                    const shared = NS.getPlacementShared();
                     const opts = NS.LOCATION_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === DEFAULT_SEPARATE_LOCATION ? "selected" : ""}>${NS.escapeHtml(opt.label)}</option>`).join("");
                     const heading = NS.SECTION_LABELS[key] || key;
-                    const selects = platforms.map(p => {
-                        const labelHtml = shared ? "" : `<label style="display:block;font-size:10px;color:#a1b0bd;text-transform:uppercase;font-weight:bold;margin-bottom:5px;">${p}</label>`;
-                        return `<div>${labelHtml}<select id="ign_${key}_location_${p}" class="ign_settings_select" data-key="${key}" data-platform="${p}">${opts}</select></div>`;
-                    }).join("");
-                    wrap.insertAdjacentHTML("beforeend", `<div class="ign_key_location_block" data-key-location-block="${key}"><h3>${NS.escapeHtml(heading)}</h3><div class="ign_locations_row">${selects}</div></div>`);
+                    const platform = getEffectivePlatform();
+                    const select = `<div><select id="ign_${key}_location_${platform}" class="ign_settings_select" data-key="${key}">${opts}</select></div>`;
+                    wrap.insertAdjacentHTML("beforeend", `<div class="ign_key_location_block" data-key-location-block="${key}"><h3>${NS.escapeHtml(heading)}</h3><div class="ign_locations_row">${select}</div></div>`);
                     wrap.querySelectorAll(`[data-key-location-block="${key}"] select`).forEach(sel => sel.addEventListener("change", syncSharedLocationNotes));
                 } else if (!checkbox.checked && existing) {
                     existing.remove();
@@ -263,9 +286,9 @@
         list.addEventListener("dragend", syncSharedLocationNotes);
         // "Combine all entries in one place": while on, every individual Separate Entry / Location
         // choice below is overridden (see NS.getSectionLocation() in 01-config-store.js) — so its own
-        // per-platform Location select(s) are shown instead, and the (now-moot) individual location
-        // UI is hidden rather than removed, so turning this back off instantly reveals each section's
-        // untouched previous configuration.
+        // Location select is shown instead, and the (now-moot) individual location UI is hidden
+        // rather than removed, so turning this back off instantly reveals each section's untouched
+        // previous configuration.
         const combineAllCheckbox = overlay.querySelector("#ign_combine_all");
         const combineAllLocations = overlay.querySelector("#ign_combine_all_locations");
         const keyLocationsWrap = overlay.querySelector("#ign_key_locations_wrap");
@@ -277,8 +300,9 @@
             if (sharedLocationNotes) sharedLocationNotes.style.display = on ? "none" : "";
         }
         if (combineAllCheckbox) combineAllCheckbox.addEventListener("change", syncCombineAllUi);
-        applyPanelSnapshot(overlay, list, snapshot);
+        applyPanelSnapshot(overlay, list, snapshot, getEffectivePlatform());
         syncSharedLocationNotes();
+        if (panelEl) panelEl.scrollTop = prevScrollTop;
         overlay.querySelectorAll(".ign_override_remove").forEach(btn => btn.addEventListener("click", () => { NS.removeUserOverride(btn.dataset.key); refreshBadgeNow(); NS.openSettingsPanel(); }));
         overlay.querySelector("#ign_override_add").addEventListener("click", () => {
             const title = overlay.querySelector("#ign_override_title").value.trim();
@@ -289,31 +313,43 @@
             refreshBadgeNow();
             NS.openSettingsPanel();
         });
-        overlay.querySelector("#ign_placement_shared").addEventListener("change", e => { NS.setPlacementShared(e.target.checked); NS.openSettingsPanel(); });
+        overlay.querySelector("#ign_placement_shared").addEventListener("change", e => { NS.setSettingsShared(e.target.checked); NS.openSettingsPanel(); });
+        const pagerPrev = overlay.querySelector("#ign_pager_prev");
+        const pagerNext = overlay.querySelector("#ign_pager_next");
+        function flipPager(direction) {
+            const enabled = NS.getEnabledPlatforms();
+            const idx = enabled.indexOf(getEffectivePlatform());
+            pagerPlatform = enabled[(idx + direction + enabled.length) % enabled.length];
+            NS.openSettingsPanel();
+        }
+        if (pagerPrev) pagerPrev.addEventListener("click", () => flipPager(-1));
+        if (pagerNext) pagerNext.addEventListener("click", () => flipPager(1));
         overlay.querySelectorAll("input[data-site-enable]").forEach(input => input.addEventListener("change", () => { NS.setSiteEnabled(input.dataset.siteEnable, input.checked); refreshBadgeNow(); NS.openSettingsPanel(); }));
         overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector("#ign_settings_cancel").addEventListener("click", () => overlay.remove());
         overlay.querySelector("#ign_settings_save").addEventListener("click", () => {
+            const shared = NS.getSettingsShared();
+            const platform = getEffectivePlatform();
+            const targets = shared ? NS.PLATFORMS : [platform];
             list.querySelectorAll(".ign_visible_checkbox").forEach(cb => {
-                (NS.SECTION_CONFIG_KEYS[cb.dataset.key] || []).forEach(configKey => NS.storage.set(configKey, cb.checked));
+                (NS.SECTION_CONFIG_KEYS[cb.dataset.key] || []).forEach(configKey => targets.forEach(p => NS.setConfigFor(configKey, p, cb.checked)));
             });
-            NS.setSectionOrder(Array.from(list.querySelectorAll(".ign_order_item")).map(li => li.dataset.key));
-            const shared = NS.getPlacementShared();
+            const order = Array.from(list.querySelectorAll(".ign_order_item")).map(li => li.dataset.key);
+            targets.forEach(p => NS.setSectionOrderFor(p, order));
             const combineAllChecked = combineAllCheckbox ? combineAllCheckbox.checked : false;
-            NS.getVisiblePlatforms().forEach(platform => {
-                const targets = shared ? NS.PLATFORMS : [ platform ];
-                targets.forEach(p => NS.setCombineAllFor(p, combineAllChecked));
-                const combineSel = overlay.querySelector(`#ign_combine_location_${platform}`);
-                if (combineSel) targets.forEach(p => NS.setCombineLocationFor(p, combineSel.value));
-                const posSel = overlay.querySelector(`#ign_badge_position_${platform}`);
-                if (posSel) targets.forEach(p => NS.setBadgePositionFor(p, posSel.value));
-                NS.getSectionOrder().forEach(key => {
-                    const sel = overlay.querySelector(`#ign_${key}_location_${platform}`);
-                    // A key with no select present means its "Separate Entry" box is unchecked —
-                    // explicitly write back "inline" so a previously-separate section reverts, rather
-                    // than leaving its old (now-invisible) location value in storage.
-                    targets.forEach(p => NS.setSectionLocationFor(key, p, sel ? sel.value : "inline"));
-                });
+            targets.forEach(p => NS.setCombineAllFor(p, combineAllChecked));
+            const hltbSearchFallbackCb = overlay.querySelector("#ign_hltb_search_fallback");
+            if (hltbSearchFallbackCb) targets.forEach(p => NS.setConfigFor("showHltbSearchFallback", p, hltbSearchFallbackCb.checked));
+            const combineSel = overlay.querySelector(`#ign_combine_location_${platform}`);
+            if (combineSel) targets.forEach(p => NS.setCombineLocationFor(p, combineSel.value));
+            const posSel = overlay.querySelector(`#ign_badge_position_${platform}`);
+            if (posSel) targets.forEach(p => NS.setBadgePositionFor(p, posSel.value));
+            order.forEach(key => {
+                const sel = overlay.querySelector(`#ign_${key}_location_${platform}`);
+                // A key with no select present means its "Separate Entry" box is unchecked —
+                // explicitly write back "inline" so a previously-separate section reverts, rather
+                // than leaving its old (now-invisible) location value in storage.
+                targets.forEach(p => NS.setSectionLocationFor(key, p, sel ? sel.value : "inline"));
             });
             overlay.remove();
             NS.registerMenuCommands();
