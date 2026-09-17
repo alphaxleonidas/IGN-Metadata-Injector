@@ -81,6 +81,14 @@
         while (node && node.parentElement && node.parentElement !== container) node = node.parentElement;
         return node && node.parentElement === container ? node : null;
     }
+    // The shared container itself (unlike commonAncestorChild, which returns a's own row inside it) —
+    // used to anchor on Epic's whole purchase/info panel without depending on it being tagged
+    // <aside> specifically, which isn't guaranteed to be stable across their markup changes.
+    function commonAncestor(a, b) {
+        let common = a.parentElement;
+        while (common && !common.contains(b)) common = common.parentElement;
+        return common;
+    }
     // `a`'s own ancestor-or-self that's a direct child of the nearest ancestor shared with `b` —
     // anchors "insert before this whole section" without needing the exact (unstable) nesting depth.
     function commonAncestorChild(a, b) {
@@ -129,7 +137,14 @@
             // <aside> is sticky-positioned, so content appended inside only becomes visible once it
             // un-sticks, by when the page has scrolled past it. Escaping to normal flow after the whole
             // row avoids that; alignTo re-aligns it visually under the sidebar's column afterward.
-            if ((pref === "sidebarBottom" || pref === "belowRightSidebarMetadata") && aside) return { element: NS.findSafeAfterTarget(aside), position: "after", alignTo: aside };
+            // Anchored on the common container of the buy button and a stable metadata row (rather
+            // than requiring an actual <aside> tag) - if Epic's markup doesn't wrap this panel in
+            // <aside> at all, buyBtn.closest("aside") finds nothing and the bare document-wide
+            // querySelector("aside") fallback can grab a completely unrelated <aside> elsewhere on
+            // the page (e.g. a left-hand nav), landing the settings gear on the wrong side entirely.
+            const devEl = document.querySelector('[data-testid="metadata-developer-single"]');
+            const sidebarPanel = (buyBtn && devEl && commonAncestor(buyBtn, devEl)) || aside;
+            if ((pref === "sidebarBottom" || pref === "belowRightSidebarMetadata") && sidebarPanel) return { element: NS.findSafeAfterTarget(sidebarPanel), position: "after", alignTo: sidebarPanel };
             if (pref === "abovePrice") {
                 const metaCols = document.querySelectorAll('[data-testid="about-metadata-layout-column"]');
                 const metaRow = metaCols.length ? metaCols[metaCols.length - 1].parentElement : null;

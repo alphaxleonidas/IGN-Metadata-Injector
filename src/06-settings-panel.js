@@ -30,6 +30,12 @@
     // Persists only for this page's lifetime - reopening the panel fresh (e.g. after
     // a full page reload) always starts back on the current page's own platform.
     let pagerPlatform = null;
+    // Live, unsaved edits per platform - kept only in memory for the duration this panel stays
+    // open (never written to storage), so switching platforms via the pager doesn't lose whatever
+    // you were mid-editing on the platform you're leaving. Cleared on Save, Cancel, or closing the
+    // panel by clicking outside it - i.e. whenever the editing session actually ends, not on every
+    // internal reopen (pager flip, shared-toggle change, override add/remove, site-enable toggle).
+    let platformDrafts = {};
     function getEffectivePlatform() {
         const enabled = NS.getEnabledPlatforms();
         if (enabled.length === 0) return NS.PLATFORMS[0];
@@ -97,11 +103,8 @@
             const opts = NS.LOCATION_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === current ? "selected" : ""}>${NS.escapeHtml(opt.label)}</option>`).join("");
             return `<div><select id="ign_${key}_location_${platform}" class="ign_settings_select" data-key="${key}">${opts}</select></div>`;
         };
-        const combineLocationSelect = () => {
-            const current = NS.getCombineLocationFor(platform);
-            const opts = NS.LOCATION_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === current ? "selected" : ""}>${NS.escapeHtml(opt.label)}</option>`).join("");
-            return `<div><select id="ign_combine_location_${platform}" class="ign_settings_select">${opts}</select></div>`;
-        };
+        // (no separate combineLocationSelect anymore - Combine All reuses Overlay Position, see
+        // NS.getSectionLocation() in 01-config-store.js)
         // One block per section currently checked as "Separate Entry" — a single Location select
         // for the current effective platform, keyed off the same generic
         // getSectionLocationFor(key, platform) storage HLTB/Leisure already used. Rebuilt whenever
@@ -123,6 +126,11 @@
                 <div id="ign_settings_panel">
                     <h2>IGN Script Settings</h2>
                     <p class="ign_settings_sub">Changes apply immediately on save — no page refresh needed.</p>
+                    <div style="margin-bottom:14px;"><h3>Enable / Disable Per Site</h3>${enableRows}</div>
+                    <label class="ign_settings_toggle_row" style="border-bottom:none;margin-bottom:14px;">
+                        <span>Search HowLongToBeat link when no data found</span>
+                        <span class="ign_switch"><input type="checkbox" id="ign_hltb_search_fallback" ${NS.getConfigFor("showHltbSearchFallback", platform) ? "checked" : ""}><span class="ign_switch_slider"></span></span>
+                    </label>
                     <div style="margin-bottom:14px;">
                         <label class="ign_settings_toggle_row" style="border-bottom:none;">
                             <span>Use the same settings for Steam and Epic</span>
@@ -138,21 +146,17 @@
                         <div>
                             <div class="ign_order_list_header"><span class="ign_separate_col_label">Separate Entry</span><h3>Section Order (drag to reorder)</h3><span class="ign_visible_col_label">Visible</span></div>
                             <ul id="ign_order_list">${orderRows}</ul>
+                            <div id="ign_order_combine_hint"></div>
                             <div style="margin-top:4px;">
                                 <label class="ign_settings_toggle_row" style="border-bottom:none;">
                                     <span>Combine all entries in one place</span>
                                     <span class="ign_switch"><input type="checkbox" id="ign_combine_all" ${combineAllChecked ? "checked" : ""}><span class="ign_switch_slider"></span></span>
                                 </label>
-                                <div id="ign_combine_all_locations" class="ign_locations_row" style="margin-top:8px;${combineAllChecked ? "" : "display:none;"}">${combineLocationSelect()}</div>
                             </div>
-                            <label class="ign_settings_toggle_row" style="border-bottom:none;margin-top:4px;">
-                                <span>Search HowLongToBeat link when no data found</span>
-                                <span class="ign_switch"><input type="checkbox" id="ign_hltb_search_fallback" ${NS.getConfigFor("showHltbSearchFallback", platform) ? "checked" : ""}><span class="ign_switch_slider"></span></span>
-                            </label>
                         </div>
                     </div>
-                    <div style="margin-top:18px;"><h3>Enable / Disable Per Site</h3>${enableRows}</div>
                     <div style="margin-top:10px;"><h3 id="ign_overlay_position_heading">Overlay Position</h3><div class="ign_locations_row">${positionSelect()}</div></div>
+                    <p id="ign_separate_entry_locations_heading" class="ign_settings_sub" style="margin-top:14px;margin-bottom:6px;${combineAllChecked ? "display:none;" : ""}"><strong style="color:#c6d4df;">Separate Entry Locations:</strong></p>
                     <div id="ign_key_locations_wrap" style="${combineAllChecked ? "display:none;" : ""}">${NS.getSectionOrderFor(platform).filter(isKeySeparate).map(keyLocationBlockHtml).join("")}</div>
                     <div id="ign_shared_location_notes" style="${combineAllChecked ? "display:none;" : ""}"></div>
                     <div style="margin-top:18px;">
@@ -193,7 +197,6 @@
             combineAll: overlay.querySelector("#ign_combine_all") ? overlay.querySelector("#ign_combine_all").checked : null,
             hltbSearchFallback: overlay.querySelector("#ign_hltb_search_fallback") ? overlay.querySelector("#ign_hltb_search_fallback").checked : null,
             locationSelects: mapValues("[data-key-location-block] select"),
-            combineLocationSelects: mapValues('[id^="ign_combine_location_"]'),
             positionSelects: mapValues('[id^="ign_badge_position_"]')
         };
     }
@@ -217,7 +220,7 @@
             const cb = overlay.querySelector("#ign_hltb_search_fallback");
             if (cb) cb.checked = snap.hltbSearchFallback;
         }
-        [snap.locationSelects, snap.combineLocationSelects, snap.positionSelects].forEach(map => {
+        [snap.locationSelects, snap.positionSelects].forEach(map => {
             Object.keys(map).forEach(id => { const sel = overlay.querySelector("#" + id); if (sel) sel.value = map[id]; });
         });
     }
@@ -230,33 +233,54 @@
         const prevScrollTop = prevPanelEl ? prevPanelEl.scrollTop : 0;
         // The platform prevOverlay actually shows — read from its own tag rather than calling
         // getEffectivePlatform() again here, since a pager click already mutates pagerPlatform to
-        // the NEW platform before calling this function, which would otherwise make the snapshot
-        // believe it was taken from the platform we're switching TO rather than the one we're
+        // the NEW platform before calling this function, which would otherwise make the capture
+        // below believe it belongs to the platform we're switching TO rather than the one we're
         // switching FROM.
         const prevPlatform = prevOverlay ? prevOverlay.dataset.ignPlatform : null;
-        const snapshot = snapshotPanelState(prevOverlay, prevOverlay ? prevOverlay.querySelector("#ign_order_list") : null, prevPlatform);
+        if (prevPlatform) {
+            platformDrafts[prevPlatform] = snapshotPanelState(prevOverlay, prevOverlay.querySelector("#ign_order_list"), prevPlatform);
+        }
         prevOverlay?.remove();
         document.body.insertAdjacentHTML("beforeend", buildSettingsPanelHtml());
         const overlay = document.getElementById("ign_settings_overlay");
         const panelEl = document.getElementById("ign_settings_panel");
         const list = document.getElementById("ign_order_list");
+        const newPlatform = overlay.dataset.ignPlatform;
         wireDragReorder(list);
-        // Rebuilds the "shared location" info note from the live (unsaved) checkbox/select state
-        // plus the live (unsaved) Section Order — called whenever any of those change. Formatted as
-        // a single "Overlapping Locations:" heading with one line per Location that currently has
-        // 2+ sections sharing it, e.g. "Below Game Media : HowLongToBeat ; HLTB Leisure Time".
+        const combineAllCheckbox = overlay.querySelector("#ign_combine_all");
+        const keyLocationsWrap = overlay.querySelector("#ign_key_locations_wrap");
+        const separateEntryLocationsHeading = overlay.querySelector("#ign_separate_entry_locations_heading");
+        const sharedLocationNotes = overlay.querySelector("#ign_shared_location_notes");
+        // Rebuilds the "shared location" info from the live (unsaved) checkbox/select state plus
+        // the live (unsaved) Section Order — called whenever any of those change. Two pieces,
+        // placed near what each is actually about: a "drag to reorder" hint right under the
+        // Section Order list itself, and the "Overlapping Locations:" heading + one line per
+        // Location that currently has 2+ sections sharing it (e.g. "Below Game Media :
+        // HowLongToBeat ; HLTB Leisure Time") down by the individual Location selects. Neither is
+        // relevant while Combine All is on (it overrides all of this with one single location), so
+        // both are cleared in that case rather than showing stale/misleading info.
         function syncSharedLocationNotes() {
-            const container = overlay.querySelector("#ign_shared_location_notes");
-            if (!container) return;
+            const hintContainer = overlay.querySelector("#ign_order_combine_hint");
+            const notesContainer = overlay.querySelector("#ign_shared_location_notes");
+            if (combineAllCheckbox && combineAllCheckbox.checked) {
+                if (hintContainer) hintContainer.innerHTML = "";
+                if (notesContainer) notesContainer.innerHTML = "";
+                return;
+            }
             const order = Array.from(list.querySelectorAll(".ign_order_item")).map(li => li.dataset.key);
             const groups = computeSharedLocationGroups(overlay);
-            if (!groups.length) { container.innerHTML = ""; return; }
+            if (!groups.length) {
+                if (hintContainer) hintContainer.innerHTML = "";
+                if (notesContainer) notesContainer.innerHTML = "";
+                return;
+            }
+            if (hintContainer) hintContainer.innerHTML = `<p class="ign_settings_sub" style="margin-top:6px;margin-bottom:0;">Drag items above to change their combined order.</p>`;
             const lines = groups.map(g => {
                 const names = order.filter(k => g.keys.includes(k)).map(k => NS.escapeHtml(NS.SECTION_LABELS[k] || k)).join(" ; ");
                 const posLabel = NS.escapeHtml((NS.LOCATION_OPTIONS.find(o => o.value === g.loc) || {}).label || g.loc);
                 return `<strong style="color:#c6d4df;">${posLabel}</strong> : ${names}`;
             });
-            container.innerHTML = `<p class="ign_settings_sub" style="margin-top:10px;margin-bottom:0;"><strong style="color:#c6d4df;">Overlapping Locations:</strong><br>${lines.join("<br>")}<br><br><span style="opacity:0.8;">Drag items in Section Order above to change their combined order.</span></p>`;
+            if (notesContainer) notesContainer.innerHTML = `<p class="ign_settings_sub" style="margin-top:10px;margin-bottom:0;"><strong style="color:#c6d4df;">Overlapping Locations:</strong><br><br>${lines.join("<br>")}</p>`;
         }
         syncSharedLocationNotes();
         // "Separate Entry" checkbox column: adds/removes that section's Location select block live
@@ -289,18 +313,15 @@
         // Location select is shown instead, and the (now-moot) individual location UI is hidden
         // rather than removed, so turning this back off instantly reveals each section's untouched
         // previous configuration.
-        const combineAllCheckbox = overlay.querySelector("#ign_combine_all");
-        const combineAllLocations = overlay.querySelector("#ign_combine_all_locations");
-        const keyLocationsWrap = overlay.querySelector("#ign_key_locations_wrap");
-        const sharedLocationNotes = overlay.querySelector("#ign_shared_location_notes");
         function syncCombineAllUi() {
             const on = combineAllCheckbox.checked;
-            if (combineAllLocations) combineAllLocations.style.display = on ? "" : "none";
             if (keyLocationsWrap) keyLocationsWrap.style.display = on ? "none" : "";
+            if (separateEntryLocationsHeading) separateEntryLocationsHeading.style.display = on ? "none" : "";
             if (sharedLocationNotes) sharedLocationNotes.style.display = on ? "none" : "";
+            syncSharedLocationNotes();
         }
         if (combineAllCheckbox) combineAllCheckbox.addEventListener("change", syncCombineAllUi);
-        applyPanelSnapshot(overlay, list, snapshot, getEffectivePlatform());
+        applyPanelSnapshot(overlay, list, platformDrafts[newPlatform], newPlatform);
         syncSharedLocationNotes();
         if (panelEl) panelEl.scrollTop = prevScrollTop;
         overlay.querySelectorAll(".ign_override_remove").forEach(btn => btn.addEventListener("click", () => { NS.removeUserOverride(btn.dataset.key); refreshBadgeNow(); NS.openSettingsPanel(); }));
@@ -325,8 +346,8 @@
         if (pagerPrev) pagerPrev.addEventListener("click", () => flipPager(-1));
         if (pagerNext) pagerNext.addEventListener("click", () => flipPager(1));
         overlay.querySelectorAll("input[data-site-enable]").forEach(input => input.addEventListener("change", () => { NS.setSiteEnabled(input.dataset.siteEnable, input.checked); refreshBadgeNow(); NS.openSettingsPanel(); }));
-        overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector("#ign_settings_cancel").addEventListener("click", () => overlay.remove());
+        overlay.addEventListener("click", e => { if (e.target === overlay) { platformDrafts = {}; overlay.remove(); } });
+        overlay.querySelector("#ign_settings_cancel").addEventListener("click", () => { platformDrafts = {}; overlay.remove(); });
         overlay.querySelector("#ign_settings_save").addEventListener("click", () => {
             const shared = NS.getSettingsShared();
             const platform = getEffectivePlatform();
@@ -340,8 +361,6 @@
             targets.forEach(p => NS.setCombineAllFor(p, combineAllChecked));
             const hltbSearchFallbackCb = overlay.querySelector("#ign_hltb_search_fallback");
             if (hltbSearchFallbackCb) targets.forEach(p => NS.setConfigFor("showHltbSearchFallback", p, hltbSearchFallbackCb.checked));
-            const combineSel = overlay.querySelector(`#ign_combine_location_${platform}`);
-            if (combineSel) targets.forEach(p => NS.setCombineLocationFor(p, combineSel.value));
             const posSel = overlay.querySelector(`#ign_badge_position_${platform}`);
             if (posSel) targets.forEach(p => NS.setBadgePositionFor(p, posSel.value));
             order.forEach(key => {
@@ -352,6 +371,7 @@
                 targets.forEach(p => NS.setSectionLocationFor(key, p, sel ? sel.value : "inline"));
             });
             overlay.remove();
+            platformDrafts = {};
             NS.registerMenuCommands();
             refreshBadgeNow();
         });

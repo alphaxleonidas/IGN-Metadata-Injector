@@ -11,6 +11,21 @@
         <p class="sub">Settings apply immediately on save — no need to reload Steam/Epic tabs that are already open (they'll pick it up on next page change).</p>
 
         <section class="full">
+            <h2>Enable / Disable Per Site</h2>
+            <div id="enable_list"></div>
+        </section>
+
+        <section class="full">
+            <label class="toggle_row" style="border-bottom:none;">
+                <span>Search HowLongToBeat link when no data found</span>
+                <span class="switch">
+                    <input type="checkbox" id="hltb_search_fallback">
+                    <span class="switch_slider"></span>
+                </span>
+            </label>
+        </section>
+
+        <section class="full">
             <label class="toggle_row" style="border-bottom:none;">
                 <span>Use the same settings for Steam and Epic</span>
                 <span class="switch">
@@ -28,6 +43,7 @@
         <section class="full">
             <div class="order_list_header"><span class="separate_col_label">Separate Entry</span><h2>Section Order (drag to reorder)</h2><span class="visible_col_label">Visible</span></div>
             <ul id="order_list"></ul>
+            <div id="order_combine_hint"></div>
             <label class="toggle_row" style="border-bottom:none;margin-top:4px;">
                 <span>Combine all entries in one place</span>
                 <span class="switch">
@@ -35,19 +51,6 @@
                     <span class="switch_slider"></span>
                 </span>
             </label>
-            <div class="locations_row" id="combine_all_locations" style="margin-top:8px;display:none;"></div>
-            <label class="toggle_row" style="border-bottom:none;margin-top:4px;">
-                <span>Search HowLongToBeat link when no data found</span>
-                <span class="switch">
-                    <input type="checkbox" id="hltb_search_fallback">
-                    <span class="switch_slider"></span>
-                </span>
-            </label>
-        </section>
-
-        <section class="full">
-            <h2>Enable / Disable Per Site</h2>
-            <div id="enable_list"></div>
         </section>
 
         <section class="full">
@@ -55,7 +58,10 @@
             <div class="locations_row" id="position_selects"></div>
         </section>
 
-        <section class="full" id="key_locations_wrap"></section>
+        <section class="full">
+            <p id="separate_entry_locations_heading" class="sub" style="margin-bottom:6px;"><strong>Separate Entry Locations:</strong></p>
+            <div id="key_locations_wrap"></div>
+        </section>
 
         <section class="full" id="shared_location_notes"></section>
 

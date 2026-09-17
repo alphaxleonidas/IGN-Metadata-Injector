@@ -94,20 +94,20 @@
     NS.getSectionLocationFor = (key, platform) => NS.storage.getSync(key + "Location" + platform, DEFAULT_SECTION_LOCATIONS[key] || "inline");
     NS.setSectionLocationFor = (key, platform, value) => NS.storage.set(key + "Location" + platform, value);
     // "Combine all entries in one place": a per-platform override that, when on, forces EVERY
-    // section (regardless of its own individually-configured Location) to the single chosen
-    // combineLocation instead — the existing "combine sections that share a Location" rendering
-    // behavior then naturally merges all of them together since they now all resolve to the same
-    // spot. Turning it back off simply stops overriding, restoring whatever each section's own
-    // Location was already set to (nothing is overwritten in storage).
+    // section (regardless of its own individually-configured Location) to the same spot as the
+    // main badge's own Overlay Position instead - the existing "combine sections that share a
+    // Location" rendering behavior then naturally merges all of them together since they now all
+    // resolve to the same spot. Turning it back off simply stops overriding, restoring whatever
+    // each section's own Location was already set to (nothing is overwritten in storage). This
+    // deliberately reuses Overlay Position rather than having its own separate location picker -
+    // that used to exist, but sitting right next to Overlay Position with near-identical choices
+    // made it look like an accidental duplicate control rather than a distinct setting.
     NS.getCombineAllFor = platform => NS.storage.getSync("combineAll" + platform, false);
     NS.setCombineAllFor = (platform, value) => NS.storage.set("combineAll" + platform, value);
     NS.getCombineAll = () => NS.getCombineAllFor(currentPlatform());
-    NS.getCombineLocationFor = platform => NS.storage.getSync("combineLocation" + platform, "belowGameMedia");
-    NS.setCombineLocationFor = (platform, value) => NS.storage.set("combineLocation" + platform, value);
-    NS.getCombineLocation = () => NS.getCombineLocationFor(currentPlatform());
     NS.getSectionLocation = key => {
         const platform = currentPlatform();
-        return NS.getCombineAllFor(platform) ? NS.getCombineLocationFor(platform) : NS.getSectionLocationFor(key, platform);
+        return NS.getCombineAllFor(platform) ? NS.getBadgePositionFor(platform) : NS.getSectionLocationFor(key, platform);
     };
     NS.setSectionLocation = (key, value) => NS.setSectionLocationFor(key, currentPlatform(), value);
     // Relative order between two or more sections that end up sharing the exact same non-inline

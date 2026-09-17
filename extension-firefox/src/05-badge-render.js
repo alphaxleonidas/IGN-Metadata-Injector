@@ -120,6 +120,23 @@
         return `<div style="${sectionRow("display:flex;flex-direction:column;gap:8px;")}"><div style="display:flex;align-items:center;justify-content:space-between;"><a href="${hltbUrl}" target="_blank" rel="noopener noreferrer" style="font-size:10px;color:${color};text-transform:uppercase;font-weight:bold;text-decoration:none;">${title} ↗</a>${gearButtonHtml()}</div><div style="display:flex;align-items:center;justify-content:space-around;background:rgba(0,0,0,0.4);padding:8px 4px;border-radius:4px;">${items}</div></div>`;
     }
     const resolveHltbUrl = (hltbUrl, displayName) => hltbUrl || `https://howlongtobeat.com/?q=${encodeURIComponent(displayName)}`;
+    // Some wrapper elements (e.g. styled with display:contents, common in CSS-in-JS component
+    // composition) generate no box of their own - getBoundingClientRect() on one returns all
+    // zeros even though its children render normally. Falling back to the union of the element's
+    // own children's rects in that case avoids collapsing the aligned node to zero width/position
+    // (which visually looked like it landed at the far left instead of under the intended column).
+    function getVisualRect(el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 || rect.height > 0) return rect;
+        let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+        Array.from(el.children).forEach(child => {
+            const r = child.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) return;
+            left = Math.min(left, r.left); right = Math.max(right, r.right);
+            top = Math.min(top, r.top); bottom = Math.max(bottom, r.bottom);
+        });
+        return left === Infinity ? rect : { left, right, top, bottom, width: right - left, height: bottom - top };
+    }
     function insertAtTarget(node, targetObj) {
         const { element, position, alignTo } = targetObj;
         if (position === "after" && element.parentNode) element.parentNode.insertBefore(node, element.nextSibling);
@@ -129,7 +146,8 @@
         if (!alignTo) return;
         // node now sits in normal flow outside alignTo's original (sticky) column — visually
         // re-align it under that column using real measured position/width.
-        const targetRect = alignTo.getBoundingClientRect(), parentRect = node.parentNode.getBoundingClientRect();
+        const targetRect = getVisualRect(alignTo), parentRect = node.parentNode.getBoundingClientRect();
+        if (targetRect.width === 0) return; // couldn't measure anything real - leave the node at its natural width/position rather than collapsing it
         node.style.width = targetRect.width + "px";
         node.style.marginLeft = (targetRect.left - parentRect.left) + "px";
         node.style.marginRight = "auto";

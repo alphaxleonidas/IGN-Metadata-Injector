@@ -11,10 +11,13 @@
     // Which platform's settings are currently being edited when NOT using
     // shared settings. Persists only for this page's lifetime (not saved) -
     // reopening the options page always starts back on the first enabled
-    // platform. Switching platforms via the pager discards any live, unsaved
-    // edits on the page you're leaving (same as not clicking Save) - only
-    // the currently-shown platform's edits are ever written on Save.
+    // platform.
     let pagerPlatform = null;
+    // Live, unsaved edits per platform - kept only in memory for this page's lifetime (never
+    // written to storage), so switching platforms via the pager doesn't lose whatever you were
+    // mid-editing on the platform you're leaving. Only Save actually persists anything; this cache
+    // is cleared after a successful Save so the next editing session starts fresh.
+    let platformDrafts = {};
 
     function currentEnabledMap(enableList) {
         const map = {};
@@ -33,10 +36,11 @@
         const positionSelects = document.getElementById("position_selects");
         const positionHeading = document.getElementById("position_heading");
         const keyLocationsWrap = document.getElementById("key_locations_wrap");
+        const orderCombineHint = document.getElementById("order_combine_hint");
+        const separateEntryLocationsHeading = document.getElementById("separate_entry_locations_heading");
         const sharedLocationNotes = document.getElementById("shared_location_notes");
         const combineAllToggle = document.getElementById("combine_all");
         const hltbSearchFallbackToggle = document.getElementById("hltb_search_fallback");
-        const combineAllLocations = document.getElementById("combine_all_locations");
         const overrideList = document.getElementById("override_list");
         const overrideEmpty = document.getElementById("override_empty");
         const saveBtn = document.getElementById("save");
@@ -151,16 +155,25 @@
             return Object.keys(byLoc).filter(loc => loc !== "inline" && byLoc[loc].length > 1).map(loc => ({ loc, keys: byLoc[loc] }));
         }
 
+        // Rebuilds the "shared location" info from the live (unsaved) checkbox/select state plus
+        // the live (unsaved) Section Order — called whenever any of those change. Two pieces,
+        // placed near what each is actually about: a "drag to reorder" hint right under the
+        // Section Order list itself, and the "Overlapping Locations:" heading + one line per
+        // Location that currently has 2+ sections sharing it, down by the individual Location
+        // selects. Neither is relevant while Combine All is on (it overrides all of this with one
+        // single location), so both are cleared in that case rather than showing stale info.
         function syncSharedLocationNotes() {
+            if (combineAllToggle.checked) { orderCombineHint.innerHTML = ""; sharedLocationNotes.innerHTML = ""; return; }
             const order = Array.from(orderList.querySelectorAll(".order_item")).map(li => li.dataset.key);
             const groups = computeSharedLocationGroups();
-            if (!groups.length) { sharedLocationNotes.innerHTML = ""; return; }
+            if (!groups.length) { orderCombineHint.innerHTML = ""; sharedLocationNotes.innerHTML = ""; return; }
+            orderCombineHint.innerHTML = `<p class="sub" style="margin-top:6px;margin-bottom:0;">Drag items above to change their combined order.</p>`;
             const lines = groups.map(g => {
                 const names = order.filter(k => g.keys.includes(k)).map(k => NS.escapeHtml(NS.SECTION_LABELS[k] || k)).join(" ; ");
                 const posLabel = NS.escapeHtml((NS.LOCATION_OPTIONS.find(o => o.value === g.loc) || {}).label || g.loc);
                 return `<strong>${posLabel}</strong> : ${names}`;
             });
-            sharedLocationNotes.innerHTML = `<p class="sub" style="margin-top:10px;margin-bottom:0;"><strong>Overlapping Locations:</strong><br>${lines.join("<br>")}<br><br><span style="opacity:0.8;">Drag items in Section Order above to change their combined order.</span></p>`;
+            sharedLocationNotes.innerHTML = `<p class="sub" style="margin-top:10px;margin-bottom:0;"><strong>Overlapping Locations:</strong><br><br>${lines.join("<br>")}</p>`;
         }
 
         // Rebuilds key_locations_wrap from scratch: one titled block per section
@@ -182,19 +195,64 @@
 
         function syncCombineAllUi() {
             const on = combineAllToggle.checked;
-            combineAllLocations.style.display = on ? "" : "none";
             keyLocationsWrap.style.display = on ? "none" : "";
+            separateEntryLocationsHeading.style.display = on ? "none" : "";
             sharedLocationNotes.style.display = on ? "none" : "";
+            syncSharedLocationNotes();
         }
 
         function renderPlacementSelects() {
             positionHeading.textContent = "Overlay Position";
             renderPlatformSelect(positionSelects, "badgePosition", NS.BADGE_POSITION_OPTIONS, p => NS.getBadgePositionFor(p));
-            renderPlatformSelect(combineAllLocations, "combineLocation", NS.LOCATION_OPTIONS, p => NS.getCombineLocationFor(p));
             renderKeyLocationBlocks();
             syncSharedLocationNotes();
             syncCombineAllUi();
         }
+
+        // Captures the live (possibly unsaved) DOM state for `platform` into platformDrafts, called
+        // right before any transition that would re-render for a different platform - so whatever
+        // was being edited isn't lost.
+        function captureDraft(platform) {
+            const mapChecked = sel => Array.from(orderList.querySelectorAll(sel)).reduce((m, el) => { m[el.dataset.key] = el.checked; return m; }, {});
+            const mapValues = sel => Array.from(document.querySelectorAll(sel)).reduce((m, el) => { m[el.id] = el.value; return m; }, {});
+            const posSel = document.getElementById("sel_badgePosition" + platform);
+            platformDrafts[platform] = {
+                order: Array.from(orderList.querySelectorAll(".order_item")).map(li => li.dataset.key),
+                visible: mapChecked(".visible_checkbox"),
+                separate: mapChecked(".separate_checkbox"),
+                combineAll: combineAllToggle.checked,
+                hltbSearchFallback: hltbSearchFallbackToggle.checked,
+                locationSelects: mapValues("[data-key-location-block] select"),
+                positionSelect: posSel ? posSel.value : null
+            };
+        }
+        // Re-applies a previously captured draft for `platform` on top of the just-rendered (fresh
+        // from storage) DOM, if one exists. No-op the first time a platform is ever shown.
+        function applyDraft(platform) {
+            const draft = platformDrafts[platform];
+            if (!draft) return;
+            draft.order.forEach(key => { const li = orderList.querySelector(`.order_item[data-key="${key}"]`); if (li) orderList.appendChild(li); });
+            Object.keys(draft.visible).forEach(key => { const cb = orderList.querySelector(`.visible_checkbox[data-key="${key}"]`); if (cb) cb.checked = draft.visible[key]; });
+            // Separate Entry checkboxes drive block creation/removal via their own change listener,
+            // so only dispatch when the freshly-rendered (storage) value actually differs from the
+            // draft - this both avoids redundant work and lets the listener build each block with
+            // the right select before location values are restored onto it below.
+            Object.keys(draft.separate).forEach(key => {
+                const cb = orderList.querySelector(`.separate_checkbox[data-key="${key}"]`);
+                if (cb && cb.checked !== draft.separate[key]) { cb.checked = draft.separate[key]; cb.dispatchEvent(new Event("change", { bubbles: true })); }
+            });
+            if (draft.combineAll !== combineAllToggle.checked) { combineAllToggle.checked = draft.combineAll; combineAllToggle.dispatchEvent(new Event("change", { bubbles: true })); }
+            hltbSearchFallbackToggle.checked = draft.hltbSearchFallback;
+            Object.keys(draft.locationSelects).forEach(id => { const sel = document.getElementById(id); if (sel) sel.value = draft.locationSelects[id]; });
+            const posSel = document.getElementById("sel_badgePosition" + platform);
+            if (posSel && draft.positionSelect != null) posSel.value = draft.positionSelect;
+        }
+        // Tracks whichever platform renderForCurrentPlatform() last actually rendered, so a
+        // transition handler can capture that platform's live state before switching away from it -
+        // reading effectivePlatform() again inside the handler wouldn't work for the shared-toggle
+        // case, since by the time its "change" event fires, the checkbox's new value already
+        // changes what effectivePlatform() resolves to.
+        let lastRenderedPlatform = null;
 
         function syncPagerUi() {
             const shared = sharedToggle.checked;
@@ -211,10 +269,13 @@
         // of specific containers, so the page's scroll position is never disturbed.
         function renderForCurrentPlatform() {
             syncPagerUi();
-            combineAllToggle.checked = NS.getCombineAllFor(effectivePlatform());
-            hltbSearchFallbackToggle.checked = NS.getConfigFor("showHltbSearchFallback", effectivePlatform());
+            const platform = effectivePlatform();
+            combineAllToggle.checked = NS.getCombineAllFor(platform);
+            hltbSearchFallbackToggle.checked = NS.getConfigFor("showHltbSearchFallback", platform);
             renderOrderList();
             renderPlacementSelects();
+            applyDraft(platform);
+            lastRenderedPlatform = platform;
         }
 
         renderEnableToggles();
@@ -222,15 +283,21 @@
         renderForCurrentPlatform();
         refreshOverrides();
 
-        sharedToggle.addEventListener("change", renderForCurrentPlatform);
-        enableList.querySelectorAll("input[data-site-enable]").forEach(input => input.addEventListener("change", renderForCurrentPlatform));
+        function captureThenRender() {
+            if (lastRenderedPlatform) captureDraft(lastRenderedPlatform);
+            renderForCurrentPlatform();
+        }
+        sharedToggle.addEventListener("change", captureThenRender);
+        enableList.querySelectorAll("input[data-site-enable]").forEach(input => input.addEventListener("change", captureThenRender));
         pagerPrev.addEventListener("click", () => {
+            if (lastRenderedPlatform) captureDraft(lastRenderedPlatform);
             const enabled = enabledPlatforms();
             const idx = enabled.indexOf(effectivePlatform());
             pagerPlatform = enabled[(idx - 1 + enabled.length) % enabled.length];
             renderForCurrentPlatform();
         });
         pagerNext.addEventListener("click", () => {
+            if (lastRenderedPlatform) captureDraft(lastRenderedPlatform);
             const enabled = enabledPlatforms();
             const idx = enabled.indexOf(effectivePlatform());
             pagerPlatform = enabled[(idx + 1) % enabled.length];
@@ -287,8 +354,6 @@
 
             targets.forEach(p => NS.setCombineAllFor(p, combineAllToggle.checked));
             targets.forEach(p => NS.setConfigFor("showHltbSearchFallback", p, hltbSearchFallbackToggle.checked));
-            const combineSel = document.getElementById("sel_combineLocation" + platform);
-            if (combineSel) targets.forEach(p => NS.setCombineLocationFor(p, combineSel.value));
             const posSel = document.getElementById("sel_badgePosition" + platform);
             if (posSel) targets.forEach(p => NS.setBadgePositionFor(p, posSel.value));
             order.forEach(key => {
@@ -299,6 +364,7 @@
                 targets.forEach(p => NS.setSectionLocationFor(key, p, sel ? sel.value : "inline"));
             });
 
+            platformDrafts = {};
             saveStatus.textContent = "Saved ✓";
             saveStatus.classList.add("visible");
             setTimeout(() => saveStatus.classList.remove("visible"), 2000);
