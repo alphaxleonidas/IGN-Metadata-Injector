@@ -1,6 +1,6 @@
 # IGN Metadata Injector
 
-Injects IGN data into Steam and Epic's game page.
+Injects IGN data into Steam and Epic's game page. Works on PC and Mobile (Firefox or extension-supporting Chromium)
 
 ## Features: 
 - IGN score and user rating
@@ -43,6 +43,7 @@ Injects IGN data into Steam and Epic's game page.
    **Requirements:** Tampermonkey or some userscript manager
 
  - Supports auto-updates
+ - Also works on mobile
 
 # Chrome/Chromium 
 
@@ -80,6 +81,13 @@ So, the idea is to make Steam app open the main chromium browser from which we c
 
 Note: If the firefox does not recognize the .zip file type, you can rename the .zip to .xpi and it should work fine. .xpi is bacially a zip file with a changed file extension name.
 
+# Firefox (Android)
+- Download the `firefox` version from the [Releases](https://github.com/alphaxleonidas/IGN-Metadata-Injector/releases) section
+- Open `about:config`
+- Set `xpinstall.signatures.required` to `false`
+- Go to Settings > About Firefox. Click on the Firefox logo 5 times > Enables Debug menu.
+- Go to settings > Scroll down to `Secret Settings` > Enable `Keep Debug Menu revealed`.
+- Settings page > Scroll down > select `Install Extension from file`. Select `ign-metadata-injector-firefox.zip`
 
 # Build Instructions:
 [For the userscript]
