@@ -339,30 +339,68 @@
             refreshOverrides();
         });
 
+        // Writes one platform's full settings block to storage. `visibleMap`/`locationMap` are
+        // keyed by section key (e.g. "scores", "hltb"); `order` is that platform's Section Order.
+        function writeSettingsForPlatform(p, s) {
+            Object.keys(NS.SECTION_CONFIG_KEYS).forEach(sectionKey => {
+                if (!(sectionKey in s.visibleMap)) return;
+                (NS.SECTION_CONFIG_KEYS[sectionKey] || []).forEach(configKey => NS.setConfigFor(configKey, p, s.visibleMap[sectionKey]));
+            });
+            NS.setSectionOrderFor(p, s.order);
+            NS.setCombineAllFor(p, s.combineAll);
+            NS.setConfigFor("showHltbSearchFallback", p, s.hltbSearchFallback);
+            if (s.positionValue != null) NS.setBadgePositionFor(p, s.positionValue);
+            s.order.forEach(key => {
+                // A key with no select present means its "Separate Entry" box is unchecked —
+                // explicitly write back "inline" so a previously-separate section reverts, rather
+                // than leaving its old (now-invisible) location value in storage.
+                NS.setSectionLocationFor(key, p, s.locationMap.hasOwnProperty(key) ? s.locationMap[key] : "inline");
+            });
+        }
+
         saveBtn.addEventListener("click", () => {
             const shared = sharedToggle.checked;
             NS.setSettingsShared(shared);
             enableList.querySelectorAll("input[data-site-enable]").forEach(input => NS.setSiteEnabled(input.dataset.siteEnable, input.checked));
             const platform = effectivePlatform();
-            const targets = shared ? NS.PLATFORMS : [platform];
 
-            orderList.querySelectorAll(".visible_checkbox").forEach(cb => {
-                (NS.SECTION_CONFIG_KEYS[cb.dataset.key] || []).forEach(configKey => targets.forEach(p => NS.setConfigFor(configKey, p, cb.checked)));
-            });
+            const visibleMap = {};
+            orderList.querySelectorAll(".visible_checkbox").forEach(cb => { visibleMap[cb.dataset.key] = cb.checked; });
             const order = Array.from(orderList.querySelectorAll(".order_item")).map(li => li.dataset.key);
-            targets.forEach(p => NS.setSectionOrderFor(p, order));
-
-            targets.forEach(p => NS.setCombineAllFor(p, combineAllToggle.checked));
-            targets.forEach(p => NS.setConfigFor("showHltbSearchFallback", p, hltbSearchFallbackToggle.checked));
             const posSel = document.getElementById("sel_badgePosition" + platform);
-            if (posSel) targets.forEach(p => NS.setBadgePositionFor(p, posSel.value));
-            order.forEach(key => {
-                const sel = document.getElementById("sel_" + key + "Location" + platform);
-                // A key with no select present means its "Separate Entry" box is unchecked —
-                // explicitly write back "inline" so a previously-separate section reverts, rather
-                // than leaving its old (now-invisible) location value in storage.
-                targets.forEach(p => NS.setSectionLocationFor(key, p, sel ? sel.value : "inline"));
-            });
+            const locationMap = {};
+            order.forEach(key => { const sel = document.getElementById("sel_" + key + "Location" + platform); locationMap[key] = sel ? sel.value : "inline"; });
+            const liveSettings = {
+                order, visibleMap, combineAll: combineAllToggle.checked, hltbSearchFallback: hltbSearchFallbackToggle.checked,
+                locationMap, positionValue: posSel ? posSel.value : null
+            };
+
+            if (shared) {
+                // Shared mode has no pager - both platforms always mirror this single live form.
+                NS.PLATFORMS.forEach(p => writeSettingsForPlatform(p, liveSettings));
+            } else {
+                // The platform currently on screen: its LIVE (possibly just-edited) DOM state.
+                writeSettingsForPlatform(platform, liveSettings);
+                // Any OTHER platform edited via the pager earlier in this session lives only in
+                // platformDrafts (in-memory, never written to storage - see captureDraft/applyDraft
+                // above). Previously Save only persisted the platform currently on screen, so
+                // switching the pager and clicking Save silently dropped whatever was edited on the
+                // platform switched away from. Flush every such draft now too.
+                Object.keys(platformDrafts).forEach(otherPlatform => {
+                    if (otherPlatform === platform) return;
+                    const draft = platformDrafts[otherPlatform];
+                    if (!draft) return;
+                    const locMap = {};
+                    draft.order.forEach(key => {
+                        const id = "sel_" + key + "Location" + otherPlatform;
+                        locMap[key] = draft.locationSelects.hasOwnProperty(id) ? draft.locationSelects[id] : "inline";
+                    });
+                    writeSettingsForPlatform(otherPlatform, {
+                        order: draft.order, visibleMap: draft.visible, combineAll: draft.combineAll,
+                        hltbSearchFallback: draft.hltbSearchFallback, locationMap: locMap, positionValue: draft.positionSelect
+                    });
+                });
+            }
 
             platformDrafts = {};
             saveStatus.textContent = "Saved ✓";

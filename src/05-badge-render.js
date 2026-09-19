@@ -319,7 +319,14 @@
     NS.renderEmpty = (status, targetUrl, gameTitle) => NS.renderCompleteBadge(status, status, [], "", "", "", "", "", null, targetUrl, gameTitle);
     NS.renderSettingsGearStandalone = function renderSettingsGearStandalone() {
         if (document.querySelector(".ign_settings_gear_standalone")) return;
-        const targetObj = NS.getTargetInsertionPoint("sidebarBottom");
+        // This standalone gear (the immediate "⚙ Settings" access point shown before/without any
+        // actual rating data) normally anchors to "sidebarBottom". On Epic's single-column mobile
+        // layout that sidebar panel sits near the very TOP of the page's DOM flow, so "bottom of the
+        // sidebar" visually lands right at the top of the page - hence the standalone gear (only
+        // this gear, not the main .ign_rating_row content, which is untouched and keeps its own
+        // normal position/preference) redirects to just after System Requirements on mobile instead.
+        // Desktop's actual sidebar keeps the original "sidebarBottom" placement unchanged.
+        const targetObj = NS.getTargetInsertionPoint((NS.IS_EPIC && NS.IS_MOBILE) ? "belowLeftSidebar" : "sidebarBottom");
         if (!targetObj) return;
         const html = `<button type="button" class="ign_open_settings_gear" title="IGN Metadata Injector settings" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#a1b0bd;cursor:pointer;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.3px;padding:5px 10px;">⚙ Settings</button>`;
         insertAtTarget(makeCtn("ign_settings_gear_standalone", "display:flex;align-items:center;justify-content:flex-end;padding:6px 2px;grid-column:1/-1;", html), targetObj);

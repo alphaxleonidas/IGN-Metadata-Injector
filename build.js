@@ -34,6 +34,7 @@ const HEADER = `// ==UserScript==
 // @version      1.0.7
 // @description  Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors.
 // @author       Leonidas
+// @icon         data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABmJLR0QA/wD/AP+gvaeTAAAE8klEQVRoge2YW2wUZRTHf99ctnS70HKT0uXSRO5LTOQSQwmGEDEx0cgl0YAxmJgIEjUhPCgPwgM++GRMQIIJokEexIR4IZEXgyVYIJEmIK0FaUy5LBTKpS0tu+3OzPFhFnZmd5ZOgSed38vkO+c75/uf+c58M7sQEREREREREfH/RT3phKeYbybpT1oxc6RySACIRp8xmLubpiq9gObck1zvoQWMq5271EaeKw1Stm7Ljze6xnekzesLxNaWKkUDMBuoB4wyKS2gA2gT4bjSncZkbsKpp8Z31du6WiGIXhwgaCe7O88eHXYBNbWz6jX0C+XEjHHobrxFDhhfLkdIupeNRb+pMbKM33KUM637WtvFIGe5OzUkCaHGOz6vw8WQ2aZaMNN+MKyplEdV8ZACznXGug5V2YcvaLzsKP9OxYGXsoXxpwloM+BpK9yi++OQysGHfe54dw/8MgIyRfM0QaY7HH6l37xZWyZXYAvdYtqojF7xK7BwKDFdGrxTDQfvgBbgv6cgXnSHHWDVaNjTA+OcoVYA4I9Ke+CFsbT3FjuC1iSjV+wNIx7cAiY7/kTbE/B5FZwwYfMoyCnw1qABUxy4Ebh6IAvzmkooSXHVmPsisDp06gDSOgwoSIgrfkccPkk8TkYAVue1+SgpwBH54HFXWpuBNRnYFxd0YFO/W1QYjlTA+9XuNYw2XwGXWVQJLC+edFuDk6Z7DUOHAbvjsCqjmJNzH7TZIR/wrQk4GoNtwTu2/Crz416D7xTSjN55IsSKo3bE4WAlrM7Atj6/T1HobwH6Fbxxz22huMCinPsgv9cPfQqqpBATdIKkbDihQSq44JgY2WexaHqg2et1BN9p1aW5wttNd9xuuuMuT9REB/7RYVC54hsr4JoOzWZhTrPp2hor3DkDyo2py59A3rbZ2QMH7sCO3uB2ckRN8Gr07YDC/zY8WAm7PBt2xoAzCdiowYZ+11bjwGtZWDkaZlruHWnM7+FPI0pv4ZEYnDfg9SxU5wvYmoBeDU4bcOxWod289mUD9zWKT6OvAIG73m2dasEk2+39++f5GMe1e1l3D1ZkIR3yGUk6BfFQvm2C7ILyvQt8bZg25jaISBNFfDzSvZuvZmH73XAih0NOQbsO02w4FoMfRsDKLCwZLNjN/IOmlFqctFqO34/17YBuaWcs3baK7QtycF13r0PQjLDf0Wkyc7GOWqrvAHTSMzpnDtZrNotBvYmSed4gU4LbxttOeSxlVZz2GkoOgit6qgloGFKqn0GF2lhnt+wteumWIKCu6Km3FewCzGL/+hr3Dd4w6H4jFfH7JLt1iddQ+jEnsg+lhlWAEjYlnZavQs0FwW7dk9ZSMVF8Uezf2VNomwBt+wPy+enkmSpLt/8G6sIIQnE+abXOUe43WmgEtLSRakOYETLkqmHrM2r5s99rLDk38hO2DEPIgeGKB1DgCHw3jIiPisVDma/RSXbrPuCbMGl1pf0cXoQfUepQuJnq60l2y7dBnrInd8Ye2ADy/RCZf6vLnW0OJ6KUKbmWU0DjENMOZOzsu+WcZQuYTvtA0v5rjQhbKP2xBHBJs3krjNCHodmsAy4FuDIibEnarWun0z5QLj7U3yrXmFXvGPp6RDUIoqE4KhafTab19qMK93KZ1BhlyGZEPa9QDkqOa5b95UTOdTyJ/BERERERERER/1X+BYUavJQ/aiRZAAAAAElFTkSuQmCC
 // @match        https://*.steampowered.com/*
 // @match        https://*.epicgames.com/*
 // @grant        GM_xmlhttpRequest
@@ -109,9 +110,15 @@ async function main() {
             fs.copyFileSync(path.join(SRC_DIR, f), path.join(outDir, f));
         });
 
+        const ICONS_DIR = path.join(ROOT_DIR, "icons");
+        fs.mkdirSync(path.join(outDir, "icons"), { recursive: true });
+        fs.readdirSync(ICONS_DIR).forEach(f => {
+            fs.copyFileSync(path.join(ICONS_DIR, f), path.join(outDir, "icons", f));
+        });
+
         fs.copyFileSync(path.join(__dirname, manifestFileName), path.join(outDir, "manifest.json"));
 
-        console.log(`Assembled ${outDir}/ (manifest.json <- ${manifestFileName}, ${moduleFiles.length} src/ modules, ${optionsFiles.length} options files)`);
+        console.log(`Assembled ${outDir}/ (manifest.json <- ${manifestFileName}, ${moduleFiles.length} src/ modules, ${optionsFiles.length} options files, icons/)`);
     }
 
     buildExtensionFolder("chrome", "manifest.chrome.json");

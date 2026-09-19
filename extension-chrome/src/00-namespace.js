@@ -2,6 +2,10 @@
     "use strict";
     NS.IS_STEAM = window.location.hostname.includes("steampowered.com");
     NS.IS_EPIC = window.location.hostname.includes("epicgames.com");
+    // Read once at inject time (not reactive to resize) - consistent with the rest of this file's
+    // DOM snapshots, and matches the breakpoint Epic's own storefront switches to a single-column
+    // mobile layout at.
+    NS.IS_MOBILE = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 768px)").matches;
     NS.state = { isFetching: false, lastProcessedTitle: "", debounceTimer: null };
     NS.escapeHtml = str => String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     NS.findSafeBeforeTarget = function findSafeBeforeTarget(el) {

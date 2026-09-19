@@ -96,6 +96,28 @@
         while (common && !common.contains(b)) common = common.parentElement;
         return common ? rowUnder(common, a) : null;
     }
+    // Epic: anchor immediately after the whole "System Requirements" section (shared by the
+    // explicit "Bottom of Left Sidebar" position and, on mobile only, the no-preference fallback -
+    // see getTargetInsertionPoint below). Pulled out so both call sites stay in sync.
+    function findEpicBelowSystemRequirements() {
+        // The whole "System Requirements" section shares this site-wide two-level wrapper (h3
+        // in a title div, both in one outer section div — same as "Follow Us"/"Editions"/"DLC"/
+        // "Ratings"). Inserting after that outer section keeps the badge outside the card's
+        // rounded background instead of squeezed between the OS tabs and the info rows below.
+        const sysReqHeading = Array.from(document.querySelectorAll("h3")).find(h => /system requirements/i.test(h.textContent || ""));
+        const sysReqSection = sysReqHeading && sysReqHeading.parentElement && sysReqHeading.parentElement.parentElement;
+        if (sysReqSection && sysReqSection.parentElement && sysReqSection.parentElement.children.length > 1) return { element: sysReqSection, position: "after" };
+        // Fallback: right after the tabs, before whichever info block comes next in the card.
+        const tabs = document.querySelector('[role="tablist"]');
+        const nextLabel = Array.from(document.querySelectorAll("p")).find(p => /login accounts required|languages supported/i.test(p.textContent || ""));
+        const row = tabs && nextLabel ? commonAncestorChild(tabs, nextLabel) : null;
+        if (row) return { element: row, position: "after" };
+        // Last resort: after the whole info card, aligned to the actual left content column.
+        const main = document.querySelector('main');
+        const fallbackRow = rowUnder(main, Array.from(document.querySelectorAll("p")).find(p => /languages supported/i.test(p.textContent || "")));
+        if (fallbackRow) return { element: fallbackRow, position: "after", alignTo: (document.querySelector("aside") && document.querySelector("aside").previousElementSibling) || fallbackRow };
+        return null;
+    }
     NS.getTargetInsertionPoint = function getTargetInsertionPoint(explicitPosition) {
         const pref = explicitPosition || NS.getBadgePosition();
         if (NS.IS_STEAM) {
@@ -155,22 +177,8 @@
             if (pref === "aboveRightSidebarMetadata") { const row = rowUnder(aside, document.querySelector('[data-testid="metadata-developer-single"]')); if (row) return { element: row, position: "before" }; }
             if (pref === "belowGameMedia") { const metaCol = document.querySelector('[data-testid="about-metadata-layout-column"]'), aboutDesc = document.getElementById("about-long-description"); const row = metaCol && aboutDesc ? commonAncestorChild(metaCol, aboutDesc) : null; if (row) return { element: row, position: "before" }; }
             if (pref === "belowLeftSidebar") {
-                // The whole "System Requirements" section shares this site-wide two-level wrapper (h3
-                // in a title div, both in one outer section div — same as "Follow Us"/"Editions"/"DLC"/
-                // "Ratings"). Inserting after that outer section keeps the badge outside the card's
-                // rounded background instead of squeezed between the OS tabs and the info rows below.
-                const sysReqHeading = Array.from(document.querySelectorAll("h3")).find(h => /system requirements/i.test(h.textContent || ""));
-                const sysReqSection = sysReqHeading && sysReqHeading.parentElement && sysReqHeading.parentElement.parentElement;
-                if (sysReqSection && sysReqSection.parentElement && sysReqSection.parentElement.children.length > 1) return { element: sysReqSection, position: "after" };
-                // Fallback: right after the tabs, before whichever info block comes next in the card.
-                const tabs = document.querySelector('[role="tablist"]');
-                const nextLabel = Array.from(document.querySelectorAll("p")).find(p => /login accounts required|languages supported/i.test(p.textContent || ""));
-                const row = tabs && nextLabel ? commonAncestorChild(tabs, nextLabel) : null;
-                if (row) return { element: row, position: "after" };
-                // Last resort: after the whole info card, aligned to the actual left content column.
-                const main = document.querySelector('main');
-                const fallbackRow = rowUnder(main, Array.from(document.querySelectorAll("p")).find(p => /languages supported/i.test(p.textContent || "")));
-                if (fallbackRow) return { element: fallbackRow, position: "after", alignTo: (aside && aside.previousElementSibling) || fallbackRow };
+                const anchor = findEpicBelowSystemRequirements();
+                if (anchor) return anchor;
             }
             const epicTarget = aside || document.querySelector('main');
             if (epicTarget) return { element: epicTarget, position: "prepend" };

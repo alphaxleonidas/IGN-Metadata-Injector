@@ -3,26 +3,41 @@
     const SETTINGS_PANEL_STYLE = `
         <style>
             #ign_settings_overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; display: flex; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-            #ign_settings_panel { background: linear-gradient(135deg, rgba(20,20,20,0.98), rgba(35,35,35,0.98)); border-radius: 10px; border-left: 5px solid #ff3e3e; box-shadow: 0 8px 30px rgba(0,0,0,0.6); width: 520px; max-width: 92vw; max-height: 85vh; overflow-y: auto; padding: 20px 22px; color: #ffffff; } #ign_settings_panel h2 { margin: 0 0 4px; font-size: 16px; color: #ff3e3e; text-transform: uppercase; letter-spacing: 0.5px; }
-            #ign_settings_panel h3 { margin: 0 0 10px; font-size: 11px; color: #a1b0bd; text-transform: uppercase; letter-spacing: 0.5px; } .ign_settings_sub { font-size: 11px; color: #8f98a0; margin: 0 0 18px; } .ign_settings_columns { display: flex; gap: 22px; flex-wrap: wrap; } .ign_settings_columns > div { flex: 1; min-width: 210px; }
-            .ign_settings_toggle_row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 12px; color: #c6d4df; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer; } .ign_switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; margin-left: 10px; } .ign_switch input { opacity: 0; width: 0; height: 0; }
+            #ign_settings_panel { background: linear-gradient(135deg, rgba(20,20,20,0.98), rgba(35,35,35,0.98)); border-radius: 10px; border-left: 5px solid #ff3e3e; box-shadow: 0 8px 30px rgba(0,0,0,0.6); width: 520px; max-width: 92vw; max-height: 85vh; overflow-y: auto; padding: 20px 22px 22px; color: #ffffff; } #ign_settings_panel h2 { margin: 0 0 4px; font-size: 16px; color: #ff3e3e; text-transform: uppercase; letter-spacing: 0.5px; }
+            #ign_settings_panel h3 { margin: 0 0 10px; font-size: 11px; color: #a1b0bd; text-transform: uppercase; letter-spacing: 0.5px; } .ign_settings_sub { font-size: 11px; color: #8f98a0; margin: 0 0 18px; }
+            /* Each logical group of settings gets its own card - a distinct background/border/radius
+               plus consistent breathing room, so the panel reads as separate topics rather than one
+               continuous wall of controls. #ign_settings_body is the flex column that spaces the
+               cards themselves; padding inside .ign_settings_section spaces each card's own content. */
+            #ign_settings_body { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+            .ign_settings_section { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; padding: 16px 18px; }
+            .ign_settings_section > h3:first-child { margin-top: 0; }
+            .ign_settings_toggle_row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 12px; color: #c6d4df; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer; } .ign_settings_toggle_row:last-child { border-bottom: none; padding-bottom: 0; } .ign_settings_toggle_row:first-child { padding-top: 0; }
+            .ign_switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; margin-left: 10px; } .ign_switch input { opacity: 0; width: 0; height: 0; }
             .ign_switch_slider { position: absolute; inset: 0; background: rgba(255,255,255,0.15); border-radius: 20px; transition: 0.2s; } .ign_switch_slider::before { content: ""; position: absolute; height: 14px; width: 14px; left: 3px; top: 3px; background: #ffffff; border-radius: 50%; transition: 0.2s; } .ign_switch input:checked + .ign_switch_slider { background: #66c0f4; } .ign_switch input:checked + .ign_switch_slider::before { transform: translateX(16px); }
-            #ign_order_list { list-style: none; margin: 0; padding: 0; } .ign_order_item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 12px; color: #c6d4df; cursor: grab; } .ign_order_item.ign_drag_over { border: 1px dashed #66c0f4; } .ign_order_handle { color: #8f98a0; font-size: 14px; } .ign_settings_actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-            .ign_order_list_header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; } .ign_order_list_header h3 { margin: 0; flex: 1; text-align: center; }
+            #ign_order_list { list-style: none; margin: 0; padding: 0; } .ign_order_item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.07); border-radius: 6px; font-size: 12px; color: #c6d4df; cursor: grab; } .ign_order_item:last-child { margin-bottom: 0; } .ign_order_item.ign_drag_over { border: 1px dashed #66c0f4; } .ign_order_handle { color: #8f98a0; font-size: 14px; }
+            .ign_settings_actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.1); }
+            .ign_order_list_header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; } .ign_order_list_header h3 { margin: 0; flex: 1; text-align: center; }
             .ign_separate_col_label { flex-shrink: 0; width: 58px; font-size: 10px; color: #a1b0bd; text-transform: uppercase; font-weight: bold; letter-spacing: 0.2px; line-height: 1.15; }
             .ign_visible_col_label { flex-shrink: 0; width: 58px; text-align: right; font-size: 10px; color: #a1b0bd; text-transform: uppercase; font-weight: bold; letter-spacing: 0.2px; line-height: 1.15; }
             .ign_separate_checkbox_wrap { flex-shrink: 0; display: flex; align-items: center; }
             .ign_separate_checkbox { width: 15px; height: 15px; accent-color: #66c0f4; cursor: pointer; }
             .ign_order_item .ign_switch { margin-left: auto; }
             .ign_settings_actions button { border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; } #ign_settings_save { background: #ff3e3e; color: #ffffff; } #ign_settings_cancel { background: rgba(255,255,255,0.1); color: #c6d4df; }
-            .ign_settings_select { width: 100%; background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; } .ign_settings_columns > div, .ign_locations_row > div { flex: 1; min-width: 200px; } .ign_locations_row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 18px; } #ign_override_list { list-style: none; margin: 0 0 10px; padding: 0; max-height: 160px; overflow-y: auto; }
-            .ign_key_location_block { margin-top: 10px; } .ign_key_location_block h3, #ign_overlay_position_heading { margin-top: 4px; font-weight: bold; color: #c6d4df; font-size: 12px; }
-            .ign_override_item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 12px; color: #c6d4df; } .ign_override_item_main { display: flex; align-items: center; gap: 8px; overflow: hidden; } .ign_override_item_main strong { font-size: 12px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .ign_settings_select { width: 100%; background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; } .ign_locations_row > div { flex: 1; min-width: 200px; } .ign_locations_row { display: flex; gap: 14px; flex-wrap: wrap; }
+            #ign_override_list { list-style: none; margin: 0 0 10px; padding: 0; max-height: 160px; overflow-y: auto; }
+            .ign_key_location_block { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); } .ign_key_location_block:first-of-type { margin-top: 16px; } .ign_key_location_block h3, #ign_overlay_position_heading { margin-top: 0; font-weight: bold; color: #c6d4df; font-size: 12px; text-transform: none; letter-spacing: normal; }
+            .ign_override_item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; margin-bottom: 6px; background: rgba(255,255,255,0.07); border-radius: 6px; font-size: 12px; color: #c6d4df; } .ign_override_item:last-child { margin-bottom: 0; } .ign_override_item_main { display: flex; align-items: center; gap: 8px; overflow: hidden; } .ign_override_item_main strong { font-size: 12px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .ign_override_pill { font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; color: #ff3e3e; border: 1px solid rgba(255,62,62,0.5); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; } .ign_override_pill_hltb { color: #66c0f4; border-color: rgba(102,192,244,0.5); } .ign_override_remove { background: transparent; border: none; color: #8f98a0; cursor: pointer; font-size: 13px; padding: 2px 6px; flex-shrink: 0; } .ign_override_remove:hover { color: #ff3e3e; }
-            .ign_override_empty { font-size: 11px; color: #8f98a0; margin: 0 0 10px; } .ign_override_form { display: flex; flex-direction: column; gap: 6px; } .ign_override_form input { background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; }
+            .ign_override_empty { font-size: 11px; color: #8f98a0; margin: 0 0 10px; } .ign_override_form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; } .ign_override_form input { background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 8px 10px; font-size: 12px; }
             .ign_override_form button { align-self: flex-end; border: none; border-radius: 6px; padding: 7px 14px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; background: rgba(102,192,244,0.15); color: #66c0f4; }
-            .ign_platform_pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 10px 0 4px; }
-            .ign_pager_arrow { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #c6d4df; border-radius: 6px; width: 30px; height: 30px; font-size: 16px; line-height: 1; cursor: pointer; }
+            .ign_platform_pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 12px 0 2px; }
+            .ign_pager_arrow { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 0; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #c6d4df; border-radius: 6px; width: 30px; height: 30px; cursor: pointer; }
+            /* A text "‹"/"›" glyph sits at x-height in most fonts (like a hyphen), not centered
+               across the full line-height box - flexbox correctly centers the line box, but the
+               visible ink still reads high, with dead space only underneath. An SVG chevron has an
+               exact geometric bounding box instead of font metrics, so flex-centering it is exact. */
+            .ign_pager_arrow svg { display: block; }
             .ign_pager_arrow:hover { background: rgba(255,255,255,0.12); color: #ffffff; }
             .ign_pager_label { font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; color: #ffffff; min-width: 90px; text-align: center; }
         </style>`;
@@ -125,49 +140,54 @@
             <div id="ign_settings_overlay" data-ign-platform="${platform}">
                 <div id="ign_settings_panel">
                     <h2>IGN Script Settings</h2>
-                    <p class="ign_settings_sub">Changes apply immediately on save — no page refresh needed.</p>
-                    <div style="margin-bottom:14px;"><h3>Enable / Disable Per Site</h3>${enableRows}</div>
-                    <label class="ign_settings_toggle_row" style="border-bottom:none;margin-bottom:14px;">
-                        <span>Search HowLongToBeat link when no data found</span>
-                        <span class="ign_switch"><input type="checkbox" id="ign_hltb_search_fallback" ${NS.getConfigFor("showHltbSearchFallback", platform) ? "checked" : ""}><span class="ign_switch_slider"></span></span>
-                    </label>
-                    <div style="margin-bottom:14px;">
-                        <label class="ign_settings_toggle_row" style="border-bottom:none;">
-                            <span>Use the same settings for Steam and Epic</span>
-                            <span class="ign_switch"><input type="checkbox" id="ign_placement_shared" ${shared ? "checked" : ""}><span class="ign_switch_slider"></span></span>
-                        </label>
-                        <div class="ign_platform_pager" style="${showPager ? "" : "display:none;"}">
-                            <button type="button" id="ign_pager_prev" class="ign_pager_arrow" aria-label="Previous platform">‹</button>
-                            <span class="ign_pager_label">${NS.escapeHtml(platform)} Settings</span>
-                            <button type="button" id="ign_pager_next" class="ign_pager_arrow" aria-label="Next platform">›</button>
+                    <p class="ign_settings_sub" style="margin-bottom:0;">Changes apply immediately on save — no page refresh needed.</p>
+                    <div id="ign_settings_body">
+                        <div class="ign_settings_section">
+                            <h3>Enable / Disable Per Site</h3>
+                            ${enableRows}
                         </div>
-                    </div>
-                    <div class="ign_settings_columns">
-                        <div>
+                        <div class="ign_settings_section">
+                            <h3>General</h3>
+                            <label class="ign_settings_toggle_row">
+                                <span>Search HowLongToBeat link when no data found</span>
+                                <span class="ign_switch"><input type="checkbox" id="ign_hltb_search_fallback" ${NS.getConfigFor("showHltbSearchFallback", platform) ? "checked" : ""}><span class="ign_switch_slider"></span></span>
+                            </label>
+                            <label class="ign_settings_toggle_row">
+                                <span>Use the same settings for Steam and Epic</span>
+                                <span class="ign_switch"><input type="checkbox" id="ign_placement_shared" ${shared ? "checked" : ""}><span class="ign_switch_slider"></span></span>
+                            </label>
+                            <div class="ign_platform_pager" style="${showPager ? "" : "display:none;"}">
+                                <button type="button" id="ign_pager_prev" class="ign_pager_arrow" aria-label="Previous platform"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+                                <span class="ign_pager_label">${NS.escapeHtml(platform)} Settings</span>
+                                <button type="button" id="ign_pager_next" class="ign_pager_arrow" aria-label="Next platform"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+                            </div>
+                        </div>
+                        <div class="ign_settings_section">
                             <div class="ign_order_list_header"><span class="ign_separate_col_label">Separate Entry</span><h3>Section Order (drag to reorder)</h3><span class="ign_visible_col_label">Visible</span></div>
                             <ul id="ign_order_list">${orderRows}</ul>
                             <div id="ign_order_combine_hint"></div>
-                            <div style="margin-top:4px;">
-                                <label class="ign_settings_toggle_row" style="border-bottom:none;">
-                                    <span>Combine all entries in one place</span>
-                                    <span class="ign_switch"><input type="checkbox" id="ign_combine_all" ${combineAllChecked ? "checked" : ""}><span class="ign_switch_slider"></span></span>
-                                </label>
-                            </div>
+                            <label class="ign_settings_toggle_row" style="margin-top:4px;">
+                                <span>Combine all entries in one place</span>
+                                <span class="ign_switch"><input type="checkbox" id="ign_combine_all" ${combineAllChecked ? "checked" : ""}><span class="ign_switch_slider"></span></span>
+                            </label>
                         </div>
-                    </div>
-                    <div style="margin-top:10px;"><h3 id="ign_overlay_position_heading">Overlay Position</h3><div class="ign_locations_row">${positionSelect()}</div></div>
-                    <p id="ign_separate_entry_locations_heading" class="ign_settings_sub" style="margin-top:14px;margin-bottom:6px;${combineAllChecked ? "display:none;" : ""}"><strong style="color:#c6d4df;">Separate Entry Locations:</strong></p>
-                    <div id="ign_key_locations_wrap" style="${combineAllChecked ? "display:none;" : ""}">${NS.getSectionOrderFor(platform).filter(isKeySeparate).map(keyLocationBlockHtml).join("")}</div>
-                    <div id="ign_shared_location_notes" style="${combineAllChecked ? "display:none;" : ""}"></div>
-                    <div style="margin-top:18px;">
-                        <h3>Per-Title Overrides</h3>
-                        <p class="ign_settings_sub" style="margin-bottom:8px;">Add/Override IGN/HowLongToBeat data. Useful when no data is found. Shared between Steam and Epic.</p>
-                        ${overrideKeys.length === 0 ? '<p class="ign_override_empty">No overrides added yet.</p>' : `<ul id="ign_override_list">${overrideRowsHtml}</ul>`}
-                        <div class="ign_override_form">
-                            <input type="text" id="ign_override_title" placeholder="Game title, exactly as shown on the store page">
-                            <input type="text" id="ign_override_ign_url" placeholder="IGN URL (optional) — e.g. https://www.ign.com/games/some-slug">
-                            <input type="text" id="ign_override_hltb_url" placeholder="HowLongToBeat URL (optional) — e.g. https://howlongtobeat.com/game/1234">
-                            <button id="ign_override_add">Add / Update</button>
+                        <div class="ign_settings_section">
+                            <h3 id="ign_overlay_position_heading">Overlay Position</h3>
+                            <div class="ign_locations_row">${positionSelect()}</div>
+                            <p id="ign_separate_entry_locations_heading" class="ign_settings_sub" style="margin-top:16px;margin-bottom:6px;${combineAllChecked ? "display:none;" : ""}"><strong style="color:#c6d4df;">Separate Entry Locations:</strong></p>
+                            <div id="ign_key_locations_wrap" style="${combineAllChecked ? "display:none;" : ""}">${NS.getSectionOrderFor(platform).filter(isKeySeparate).map(keyLocationBlockHtml).join("")}</div>
+                            <div id="ign_shared_location_notes" style="${combineAllChecked ? "display:none;" : ""}"></div>
+                        </div>
+                        <div class="ign_settings_section">
+                            <h3>Per-Title Overrides</h3>
+                            <p class="ign_settings_sub" style="margin-bottom:0;">Add/Override IGN/HowLongToBeat data. Useful when no data is found. Shared between Steam and Epic.</p>
+                            ${overrideKeys.length === 0 ? '<p class="ign_override_empty" style="margin-top:10px;">No overrides added yet.</p>' : `<ul id="ign_override_list" style="margin-top:10px;">${overrideRowsHtml}</ul>`}
+                            <div class="ign_override_form">
+                                <input type="text" id="ign_override_title" placeholder="Game title, exactly as shown on the store page">
+                                <input type="text" id="ign_override_ign_url" placeholder="IGN URL (optional) — e.g. https://www.ign.com/games/some-slug">
+                                <input type="text" id="ign_override_hltb_url" placeholder="HowLongToBeat URL (optional) — e.g. https://howlongtobeat.com/game/1234">
+                                <button id="ign_override_add">Add / Update</button>
+                            </div>
                         </div>
                     </div>
                     <div class="ign_settings_actions"><button id="ign_settings_cancel">Cancel</button><button id="ign_settings_save">Save</button></div>
@@ -348,28 +368,73 @@
         overlay.querySelectorAll("input[data-site-enable]").forEach(input => input.addEventListener("change", () => { NS.setSiteEnabled(input.dataset.siteEnable, input.checked); refreshBadgeNow(); NS.openSettingsPanel(); }));
         overlay.addEventListener("click", e => { if (e.target === overlay) { platformDrafts = {}; overlay.remove(); } });
         overlay.querySelector("#ign_settings_cancel").addEventListener("click", () => { platformDrafts = {}; overlay.remove(); });
-        overlay.querySelector("#ign_settings_save").addEventListener("click", () => {
-            const shared = NS.getSettingsShared();
-            const platform = getEffectivePlatform();
-            const targets = shared ? NS.PLATFORMS : [platform];
-            list.querySelectorAll(".ign_visible_checkbox").forEach(cb => {
-                (NS.SECTION_CONFIG_KEYS[cb.dataset.key] || []).forEach(configKey => targets.forEach(p => NS.setConfigFor(configKey, p, cb.checked)));
+        // Writes one platform's full settings block to storage. `visibleMap`/`locationMap` are
+        // keyed by section key (e.g. "scores", "hltb"); `order` is that platform's Section Order.
+        function writeSettingsForPlatform(p, s) {
+            Object.keys(NS.SECTION_CONFIG_KEYS).forEach(sectionKey => {
+                if (!(sectionKey in s.visibleMap)) return;
+                (NS.SECTION_CONFIG_KEYS[sectionKey] || []).forEach(configKey => NS.setConfigFor(configKey, p, s.visibleMap[sectionKey]));
             });
-            const order = Array.from(list.querySelectorAll(".ign_order_item")).map(li => li.dataset.key);
-            targets.forEach(p => NS.setSectionOrderFor(p, order));
-            const combineAllChecked = combineAllCheckbox ? combineAllCheckbox.checked : false;
-            targets.forEach(p => NS.setCombineAllFor(p, combineAllChecked));
-            const hltbSearchFallbackCb = overlay.querySelector("#ign_hltb_search_fallback");
-            if (hltbSearchFallbackCb) targets.forEach(p => NS.setConfigFor("showHltbSearchFallback", p, hltbSearchFallbackCb.checked));
-            const posSel = overlay.querySelector(`#ign_badge_position_${platform}`);
-            if (posSel) targets.forEach(p => NS.setBadgePositionFor(p, posSel.value));
-            order.forEach(key => {
-                const sel = overlay.querySelector(`#ign_${key}_location_${platform}`);
+            NS.setSectionOrderFor(p, s.order);
+            if (s.combineAll !== null && s.combineAll !== undefined) NS.setCombineAllFor(p, s.combineAll);
+            if (s.hltbSearchFallback !== null && s.hltbSearchFallback !== undefined) NS.setConfigFor("showHltbSearchFallback", p, s.hltbSearchFallback);
+            if (s.positionValue !== undefined) NS.setBadgePositionFor(p, s.positionValue);
+            s.order.forEach(key => {
                 // A key with no select present means its "Separate Entry" box is unchecked —
                 // explicitly write back "inline" so a previously-separate section reverts, rather
                 // than leaving its old (now-invisible) location value in storage.
-                targets.forEach(p => NS.setSectionLocationFor(key, p, sel ? sel.value : "inline"));
+                NS.setSectionLocationFor(key, p, s.locationMap.hasOwnProperty(key) ? s.locationMap[key] : "inline");
             });
+        }
+        overlay.querySelector("#ign_settings_save").addEventListener("click", () => {
+            const shared = NS.getSettingsShared();
+            const platform = getEffectivePlatform();
+            if (shared) {
+                // Shared mode has no pager - both platforms always mirror this single live form.
+                const visibleMap = {};
+                list.querySelectorAll(".ign_visible_checkbox").forEach(cb => { visibleMap[cb.dataset.key] = cb.checked; });
+                const order = Array.from(list.querySelectorAll(".ign_order_item")).map(li => li.dataset.key);
+                const combineAll = combineAllCheckbox ? combineAllCheckbox.checked : false;
+                const hltbSearchFallbackCb = overlay.querySelector("#ign_hltb_search_fallback");
+                const hltbSearchFallback = hltbSearchFallbackCb ? hltbSearchFallbackCb.checked : false;
+                const posSel = overlay.querySelector(`#ign_badge_position_${platform}`);
+                const locationMap = {};
+                order.forEach(key => { const sel = overlay.querySelector(`#ign_${key}_location_${platform}`); locationMap[key] = sel ? sel.value : "inline"; });
+                const s = { order, visibleMap, combineAll, hltbSearchFallback, locationMap, positionValue: posSel ? posSel.value : undefined };
+                NS.PLATFORMS.forEach(p => writeSettingsForPlatform(p, s));
+            } else {
+                // The platform currently on screen: read its LIVE (possibly just-edited) DOM state.
+                const visibleMap = {};
+                list.querySelectorAll(".ign_visible_checkbox").forEach(cb => { visibleMap[cb.dataset.key] = cb.checked; });
+                const order = Array.from(list.querySelectorAll(".ign_order_item")).map(li => li.dataset.key);
+                const combineAll = combineAllCheckbox ? combineAllCheckbox.checked : false;
+                const hltbSearchFallbackCb = overlay.querySelector("#ign_hltb_search_fallback");
+                const hltbSearchFallback = hltbSearchFallbackCb ? hltbSearchFallbackCb.checked : false;
+                const posSel = overlay.querySelector(`#ign_badge_position_${platform}`);
+                const locationMap = {};
+                order.forEach(key => { const sel = overlay.querySelector(`#ign_${key}_location_${platform}`); locationMap[key] = sel ? sel.value : "inline"; });
+                writeSettingsForPlatform(platform, { order, visibleMap, combineAll, hltbSearchFallback, locationMap, positionValue: posSel ? posSel.value : undefined });
+                // Any OTHER platform the user edited via the pager earlier in this session lives only
+                // in platformDrafts (in-memory, never written to storage - see snapshotPanelState /
+                // applyPanelSnapshot above). Previously Save only persisted the platform currently on
+                // screen, so switching the pager and clicking Save silently dropped whatever was
+                // edited on the platform switched away from. Flush every such draft now too.
+                Object.keys(platformDrafts).forEach(otherPlatform => {
+                    if (otherPlatform === platform) return;
+                    const snap = platformDrafts[otherPlatform];
+                    if (!snap) return;
+                    const locMap = {};
+                    snap.order.forEach(key => {
+                        const id = `ign_${key}_location_${otherPlatform}`;
+                        locMap[key] = snap.locationSelects.hasOwnProperty(id) ? snap.locationSelects[id] : "inline";
+                    });
+                    writeSettingsForPlatform(otherPlatform, {
+                        order: snap.order, visibleMap: snap.visible, combineAll: snap.combineAll,
+                        hltbSearchFallback: snap.hltbSearchFallback, locationMap: locMap,
+                        positionValue: snap.positionSelects[`ign_badge_position_${otherPlatform}`]
+                    });
+                });
+            }
             overlay.remove();
             platformDrafts = {};
             NS.registerMenuCommands();

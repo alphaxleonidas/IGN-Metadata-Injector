@@ -10,73 +10,69 @@
         <h1>IGN Metadata Injector</h1>
         <p class="sub">Settings apply immediately on save — no need to reload Steam/Epic tabs that are already open (they'll pick it up on next page change).</p>
 
-        <section class="full">
-            <h2>Enable / Disable Per Site</h2>
-            <div id="enable_list"></div>
-        </section>
+        <div id="settings_body">
+            <section class="card">
+                <h2>Enable / Disable Per Site</h2>
+                <div id="enable_list"></div>
+            </section>
 
-        <section class="full">
-            <label class="toggle_row" style="border-bottom:none;">
-                <span>Search HowLongToBeat link when no data found</span>
-                <span class="switch">
-                    <input type="checkbox" id="hltb_search_fallback">
-                    <span class="switch_slider"></span>
-                </span>
-            </label>
-        </section>
+            <section class="card">
+                <h2>General</h2>
+                <label class="toggle_row">
+                    <span>Search HowLongToBeat link when no data found</span>
+                    <span class="switch">
+                        <input type="checkbox" id="hltb_search_fallback">
+                        <span class="switch_slider"></span>
+                    </span>
+                </label>
+                <label class="toggle_row">
+                    <span>Use the same settings for Steam and Epic</span>
+                    <span class="switch">
+                        <input type="checkbox" id="placement_shared">
+                        <span class="switch_slider"></span>
+                    </span>
+                </label>
+                <div id="platform_pager" class="platform_pager" hidden>
+                    <button type="button" id="pager_prev" class="pager_arrow" aria-label="Previous platform"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+                    <span id="pager_label" class="pager_label"></span>
+                    <button type="button" id="pager_next" class="pager_arrow" aria-label="Next platform"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+                </div>
+            </section>
 
-        <section class="full">
-            <label class="toggle_row" style="border-bottom:none;">
-                <span>Use the same settings for Steam and Epic</span>
-                <span class="switch">
-                    <input type="checkbox" id="placement_shared">
-                    <span class="switch_slider"></span>
-                </span>
-            </label>
-            <div id="platform_pager" class="platform_pager" hidden>
-                <button type="button" id="pager_prev" class="pager_arrow" aria-label="Previous platform">‹</button>
-                <span id="pager_label" class="pager_label"></span>
-                <button type="button" id="pager_next" class="pager_arrow" aria-label="Next platform">›</button>
-            </div>
-        </section>
+            <section class="card">
+                <div class="order_list_header"><span class="separate_col_label">Separate Entry</span><h2>Section Order (drag to reorder)</h2><span class="visible_col_label">Visible</span></div>
+                <ul id="order_list"></ul>
+                <div id="order_combine_hint"></div>
+                <label class="toggle_row" style="margin-top:4px;">
+                    <span>Combine all entries in one place</span>
+                    <span class="switch">
+                        <input type="checkbox" id="combine_all">
+                        <span class="switch_slider"></span>
+                    </span>
+                </label>
+            </section>
 
-        <section class="full">
-            <div class="order_list_header"><span class="separate_col_label">Separate Entry</span><h2>Section Order (drag to reorder)</h2><span class="visible_col_label">Visible</span></div>
-            <ul id="order_list"></ul>
-            <div id="order_combine_hint"></div>
-            <label class="toggle_row" style="border-bottom:none;margin-top:4px;">
-                <span>Combine all entries in one place</span>
-                <span class="switch">
-                    <input type="checkbox" id="combine_all">
-                    <span class="switch_slider"></span>
-                </span>
-            </label>
-        </section>
+            <section class="card">
+                <h2 id="position_heading">Overlay Position</h2>
+                <div class="locations_row" id="position_selects"></div>
+                <p id="separate_entry_locations_heading" class="sub" style="margin-top:18px;margin-bottom:6px;"><strong>Separate Entry Locations:</strong></p>
+                <div id="key_locations_wrap"></div>
+                <div id="shared_location_notes"></div>
+            </section>
 
-        <section class="full">
-            <h2 id="position_heading">Overlay Position</h2>
-            <div class="locations_row" id="position_selects"></div>
-        </section>
-
-        <section class="full">
-            <p id="separate_entry_locations_heading" class="sub" style="margin-bottom:6px;"><strong>Separate Entry Locations:</strong></p>
-            <div id="key_locations_wrap"></div>
-        </section>
-
-        <section class="full" id="shared_location_notes"></section>
-
-        <section class="full">
-            <h2>Per-Title Overrides</h2>
-            <p class="sub">Add/Override IGN/HowLongToBeat data. Useful when no data is found.</p>
-            <ul id="override_list"></ul>
-            <p id="override_empty" class="empty" hidden>No overrides added yet.</p>
-            <div class="override_form">
-                <input type="text" id="override_title" placeholder="Game title, exactly as shown on the store page">
-                <input type="text" id="override_ign_url" placeholder="IGN URL (optional) — e.g. https://www.ign.com/games/some-slug">
-                <input type="text" id="override_hltb_url" placeholder="HowLongToBeat URL (optional) — e.g. https://howlongtobeat.com/game/1234">
-                <button id="override_add">Add / Update</button>
-            </div>
-        </section>
+            <section class="card">
+                <h2>Per-Title Overrides</h2>
+                <p class="sub" style="margin-bottom:0;">Add/Override IGN/HowLongToBeat data. Useful when no data is found.</p>
+                <ul id="override_list" style="margin-top:12px;"></ul>
+                <p id="override_empty" class="empty" hidden>No overrides added yet.</p>
+                <div class="override_form">
+                    <input type="text" id="override_title" placeholder="Game title, exactly as shown on the store page">
+                    <input type="text" id="override_ign_url" placeholder="IGN URL (optional) — e.g. https://www.ign.com/games/some-slug">
+                    <input type="text" id="override_hltb_url" placeholder="HowLongToBeat URL (optional) — e.g. https://howlongtobeat.com/game/1234">
+                    <button id="override_add">Add / Update</button>
+                </div>
+            </section>
+        </div>
 
         <div class="actions">
             <span id="save_status"></span>

@@ -3,10 +3,16 @@ body { margin: 0; background: #16181c; font-family: -apple-system, BlinkMacSyste
 h1 { margin: 0 0 4px; font-size: 20px; color: #ff3e3e; text-transform: uppercase; letter-spacing: 0.5px; }
 h2 { margin: 0 0 10px; font-size: 12px; color: #a1b0bd; text-transform: uppercase; letter-spacing: 0.5px; }
 .sub { font-size: 12px; color: #8f98a0; margin: 0 0 20px; line-height: 1.5; }
-section { margin-bottom: 24px; }
-.columns { display: flex; gap: 28px; flex-wrap: wrap; }
-.columns > section { flex: 1; min-width: 260px; }
+/* Each logical group of settings gets its own card - a distinct background/border/radius plus
+   consistent breathing room, so the page reads as separate topics rather than one continuous
+   scroll of controls. #settings_body is the flex column that spaces the cards themselves;
+   padding inside .card spaces each card's own content. */
+#settings_body { display: flex; flex-direction: column; gap: 20px; margin-bottom: 28px; }
+section.card { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; padding: 20px 22px; margin: 0; }
+section.card > h2:first-child { margin-top: 0; }
 .toggle_row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; font-size: 13px; color: #c6d4df; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer; }
+.toggle_row:last-child { border-bottom: none; padding-bottom: 0; }
+.toggle_row:first-child { padding-top: 0; }
 .switch { position: relative; display: inline-block; width: 38px; height: 21px; flex-shrink: 0; margin-left: 12px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .switch_slider { position: absolute; inset: 0; background: rgba(255,255,255,0.15); border-radius: 21px; transition: 0.2s; }
@@ -21,9 +27,10 @@ section { margin-bottom: 24px; }
 .separate_checkbox_wrap { flex-shrink: 0; display: flex; align-items: center; }
 .separate_checkbox { width: 16px; height: 16px; accent-color: #66c0f4; cursor: pointer; }
 .order_item .switch { margin-left: auto; }
-.key_location_block { margin-top: 20px; }
+.key_location_block { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.06); }
+.key_location_block:first-of-type { margin-top: 20px; }
 .key_location_block h2, #position_heading { margin-bottom: 10px; font-weight: bold; color: #c6d4df; }
-.order_item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 7px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 13px; color: #c6d4df; cursor: grab; }
+.order_item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 7px; background: rgba(255,255,255,0.07); border-radius: 6px; font-size: 13px; color: #c6d4df; cursor: grab; }
 .order_item > span:not(.order_handle):not(.switch) { flex: 1; }
 .order_handle { color: #8f98a0; font-size: 15px; }
 .select { width: 100%; max-width: 420px; background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 9px 11px; font-size: 13px; }
@@ -31,7 +38,7 @@ section { margin-bottom: 24px; }
 .locations_row > div { flex: 1; min-width: 260px; }
 .platform_select_label { display: block; font-size: 11px; color: #a1b0bd; text-transform: uppercase; font-weight: bold; letter-spacing: 0.3px; margin-bottom: 6px; }
 #override_list { list-style: none; margin: 0 0 12px; padding: 0; max-height: 260px; overflow-y: auto; }
-.override_item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; margin-bottom: 7px; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 13px; color: #c6d4df; }
+.override_item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; margin-bottom: 7px; background: rgba(255,255,255,0.07); border-radius: 6px; font-size: 13px; color: #c6d4df; }
 .override_item_main { display: flex; align-items: center; gap: 10px; overflow: hidden; }
 .override_item_main strong { font-size: 13px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .override_pill { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; color: #ff3e3e; border: 1px solid rgba(255,62,62,0.5); border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
@@ -42,11 +49,21 @@ section { margin-bottom: 24px; }
 .override_form { display: flex; flex-direction: column; gap: 8px; max-width: 480px; }
 .override_form input { background: rgba(255,255,255,0.06); color: #c6d4df; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 9px 11px; font-size: 13px; }
 .override_form button { align-self: flex-start; border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; background: rgba(102,192,244,0.15); color: #66c0f4; }
-.actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
+.actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 0; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
 #save_status { font-size: 12px; color: #66c0f4; opacity: 0; transition: opacity 0.2s; }
 #save_status.visible { opacity: 1; }
 #save { border: none; border-radius: 6px; padding: 10px 22px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; background: #ff3e3e; color: #ffffff; }
-.platform_pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 12px 0 4px; }
-.pager_arrow { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #c6d4df; border-radius: 6px; width: 34px; height: 34px; font-size: 18px; line-height: 1; cursor: pointer; }
+.platform_pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 14px 0 2px; }
+/* Fixed-size icon buttons need explicit flex centering - a bare line-height (the old approach)
+   leaves the glyph riding on the browser's own default <button> padding/box metrics, which
+   desktop Chrome/Firefox render a few px off-center for "‹"/"›" specifically (their glyph box
+   isn't symmetric like a plain letter). Flex centering with padding zeroed out pins it
+   dead-center regardless of that. */
+.pager_arrow { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 0; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #c6d4df; border-radius: 6px; width: 34px; height: 34px; cursor: pointer; }
+/* A text "‹"/"›" glyph sits at x-height in most fonts (like a hyphen), not centered across the
+   full line-height box - flexbox correctly centers the line box, but the visible ink still reads
+   high, with dead space only underneath. An SVG chevron has an exact geometric bounding box
+   instead of font metrics, so flex-centering it is exact. */
+.pager_arrow svg { display: block; }
 .pager_arrow:hover { background: rgba(255,255,255,0.12); color: #ffffff; }
 .pager_label { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; color: #ffffff; min-width: 100px; text-align: center; }
