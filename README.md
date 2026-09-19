@@ -25,8 +25,8 @@ Injects IGN data into Steam and Epic's game page. Works on PC and Mobile (Firefo
 - Toggle all elements in a single place
    
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/8967d059-8a40-47bd-8053-ac3764a723ce" alt="Epic version" width="45%" height="300" style="object-fit: cover;" />
-  <img src="https://github.com/user-attachments/assets/a06a1d09-3976-4c17-a5b6-292e84059506" alt="Steam version" width="53%" height="300" style="object-fit: cover;" />
+  <img src="https://github.com/user-attachments/assets/8967d059-8a40-47bd-8053-ac3764a723ce" alt="Epic version" width="46%" height="300" style="object-fit: cover;" />
+  <img src="https://github.com/user-attachments/assets/a06a1d09-3976-4c17-a5b6-292e84059506" alt="Steam version" width="52%" height="300" style="object-fit: cover;" />
 </p>
 <img width="20%" height="2011" alt="Screenshot_20260919_134522_Fennec" src="https://github.com/user-attachments/assets/84f40924-bd60-4985-97a0-59870cf24c57" />
 <img width="21%" height="1919" alt="Screenshot_20260918_095345_Fennec" src="https://github.com/user-attachments/assets/2dc7427e-2a75-40f3-a992-debc3bdb782d" />
