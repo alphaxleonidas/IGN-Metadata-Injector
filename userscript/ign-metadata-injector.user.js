@@ -741,7 +741,7 @@ e.target.closest&&e.target.closest(".ign_open_settings_gear")&&NS.openSettings()
 })
 }(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
 "use strict"
-;const EDITION_NOISE_RE=/\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|director's cut|anniversary|special)\s*(edition)?\b/gi,EDITION_QUALIFIER_TEST_RE=new RegExp(EDITION_NOISE_RE.source,"i"),STOPWORDS=new Set(["the","a","an","of","and","edition"]),ROMAN_TABLE=[[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]]
+;const EDITION_NOISE_RE=/\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|remaster|director's cut|anniversary|special)\s*(edition)?\b/gi,EDITION_QUALIFIER_TEST_RE=new RegExp(EDITION_NOISE_RE.source,"i"),STOPWORDS=new Set(["the","a","an","of","and","edition"]),ROMAN_TABLE=[[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]]
 ;function toRoman(num){let n=num,result=""
 ;for(const[value,numeral]of ROMAN_TABLE)for(;n>=value;)result+=numeral,
 n-=value;return result}const ROMAN_LOOKUP={}
