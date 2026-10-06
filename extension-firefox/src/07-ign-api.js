@@ -18,7 +18,7 @@
     // Edition/version qualifiers add noise that dilutes comparison without
     // helping distinguish one game from another.
     const EDITION_NOISE_RE =
-        /\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|director's cut|anniversary|special)\s*(edition)?\b/gi;
+        /\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|remaster|director's cut|anniversary|special)\s*(edition)?\b/gi;
     // Non-global copy for repeated .test() calls - a 'g' flag regex keeps
     // .lastIndex state between calls, which would silently break every other
     // check if reused as-is.
