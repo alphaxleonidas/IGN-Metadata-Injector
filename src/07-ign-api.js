@@ -41,6 +41,22 @@
     // that if IGN only has an edition-suffixed page for a given game, that
     // candidate easily clears MIN_MATCH_SCORE after the penalty.
     const EDITION_CANDIDATE_PENALTY = 0.35;
+    // Multi-game "Collection"-style IGN pages are a different product from the single game a store
+    // listing is for. E.g. Steam's "Castlevania: Lords of Shadow - Ultimate Edition" must not resolve
+    // to IGN's "Castlevania: Lords of Shadow Collection": once "Ultimate Edition" is stripped both
+    // names share every significant word, and the Collection's later release year (matching the
+    // store's) can out-score the 2010 base game via the year bonus/penalty above.
+    // These words are deliberately NOT added to EDITION_NOISE_RE: that regex runs on BOTH sides, so
+    // it would also erase "Collection" from a store title that genuinely is one (e.g. "Halo: The
+    // Master Chief Collection") and shift every match toward the bare franchise page. Instead this is
+    // candidate-only and applies per word, only when the candidate carries a bundle word the search
+    // term does NOT contain; it shares EDITION_CANDIDATE_PENALTY so it likewise outweighs the year swing.
+    const BUNDLE_WORD_RE = /\b(collection|compilation|trilogy|anthology|bundle)\b/gi;
+    const bundleWords = str => String(str).toLowerCase().match(BUNDLE_WORD_RE) || [];
+    function hasExtraBundleWord(candidateName, term) {
+        const wanted = bundleWords(term);
+        return bundleWords(candidateName).some(w => !wanted.includes(w));
+    }
 
     // Words too generic to count as evidence of a match either way.
     const STOPWORDS = new Set(["the", "a", "an", "of", "and", "edition"]);
@@ -137,8 +153,17 @@
     const MIN_MATCH_SCORE = 0.5; // final F1-style score floor, post-recall-gate
     const YEAR_MATCH_BONUS = 0.15;
     const YEAR_MISMATCH_PENALTY = 0.15;
+    // When the STORE title is itself an edition ("... Ultimate Edition"), it is a re-release: Steam's
+    // date is the re-release's (e.g. 2013 for a 2010 game), so the non-edition IGN page we want is
+    // expected to be dated EARLIER than the store year. For that direction only, the mismatch penalty
+    // shrinks to this much per year of gap (capped at YEAR_MISMATCH_PENALTY, so a 3-year gap costs
+    // 0.03 instead of 0.15). An IGN page dated LATER than the store's edition keeps the full penalty:
+    // an edition cannot predate its base game, so that really is evidence of a different game.
+    // A year MATCH is still rewarded either way (e.g. "Resident Evil 4 Deluxe Edition" 2023 vs IGN's
+    // 2005 original and 2023 remake).
+    const EDITION_EARLIER_YEAR_PENALTY_PER_YEAR = 0.01;
 
-    function scoreCandidate(targetTokens, candidateTokens, storeYear, candidateObj) {
+    function scoreCandidate(targetTokens, candidateTokens, storeYear, candidateObj, storeIsEdition = false) {
         if (targetTokens.length === 0 || candidateTokens.length === 0) return -1;
         const targetSet = new Set(targetTokens);
         const candidateSet = new Set(candidateTokens);
@@ -153,7 +178,11 @@
 
         if (storeYear != null) {
             const ignYear = getIgnReleaseYear(candidateObj);
-            if (ignYear != null) score += ignYear === storeYear ? YEAR_MATCH_BONUS : -YEAR_MISMATCH_PENALTY;
+            if (ignYear != null) {
+                if (ignYear === storeYear) score += YEAR_MATCH_BONUS;
+                else if (storeIsEdition && ignYear < storeYear) score -= Math.min(YEAR_MISMATCH_PENALTY, EDITION_EARLIER_YEAR_PENALTY_PER_YEAR * (storeYear - ignYear));
+                else score -= YEAR_MISMATCH_PENALTY;
+            }
         }
         return score;
     }
@@ -208,12 +237,13 @@
         rawIgnSearch(term, results => {
             if (!results || results.length === 0) return callback(null);
             const targetTokens = significantTokens(term);
+            const termIsEdition = EDITION_QUALIFIER_TEST_RE.test(term);
             let best = null, bestScore = -Infinity;
             results.forEach(obj => {
                 const name = getGameName(obj);
                 if (!name || !obj.slug) return;
-                let score = scoreCandidate(targetTokens, significantTokens(name), storeYear, obj);
-                if (score >= 0 && EDITION_QUALIFIER_TEST_RE.test(name)) score -= EDITION_CANDIDATE_PENALTY;
+                let score = scoreCandidate(targetTokens, significantTokens(name), storeYear, obj, termIsEdition);
+                if (score >= 0 && (EDITION_QUALIFIER_TEST_RE.test(name) || hasExtraBundleWord(name, term))) score -= EDITION_CANDIDATE_PENALTY;
                 if (score > bestScore) { bestScore = score; best = obj; }
             });
             if (!best || bestScore < MIN_MATCH_SCORE) return callback(null);

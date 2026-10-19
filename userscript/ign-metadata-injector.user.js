@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IGN Metadata Injector
 // @namespace    http://tampermonkey.net/
-// @version      1.0.8
+// @version      1.0.9
 // @description  Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors.
 // @author       Leonidas
 // @icon         data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABmJLR0QA/wD/AP+gvaeTAAAE8klEQVRoge2YW2wUZRTHf99ctnS70HKT0uXSRO5LTOQSQwmGEDEx0cgl0YAxmJgIEjUhPCgPwgM++GRMQIIJokEexIR4IZEXgyVYIJEmIK0FaUy5LBTKpS0tu+3OzPFhFnZmd5ZOgSed38vkO+c75/uf+c58M7sQEREREREREfH/RT3phKeYbybpT1oxc6RySACIRp8xmLubpiq9gObck1zvoQWMq5271EaeKw1Stm7Ljze6xnekzesLxNaWKkUDMBuoB4wyKS2gA2gT4bjSncZkbsKpp8Z31du6WiGIXhwgaCe7O88eHXYBNbWz6jX0C+XEjHHobrxFDhhfLkdIupeNRb+pMbKM33KUM637WtvFIGe5OzUkCaHGOz6vw8WQ2aZaMNN+MKyplEdV8ZACznXGug5V2YcvaLzsKP9OxYGXsoXxpwloM+BpK9yi++OQysGHfe54dw/8MgIyRfM0QaY7HH6l37xZWyZXYAvdYtqojF7xK7BwKDFdGrxTDQfvgBbgv6cgXnSHHWDVaNjTA+OcoVYA4I9Ke+CFsbT3FjuC1iSjV+wNIx7cAiY7/kTbE/B5FZwwYfMoyCnw1qABUxy4Ebh6IAvzmkooSXHVmPsisDp06gDSOgwoSIgrfkccPkk8TkYAVue1+SgpwBH54HFXWpuBNRnYFxd0YFO/W1QYjlTA+9XuNYw2XwGXWVQJLC+edFuDk6Z7DUOHAbvjsCqjmJNzH7TZIR/wrQk4GoNtwTu2/Crz416D7xTSjN55IsSKo3bE4WAlrM7Atj6/T1HobwH6Fbxxz22huMCinPsgv9cPfQqqpBATdIKkbDihQSq44JgY2WexaHqg2et1BN9p1aW5wttNd9xuuuMuT9REB/7RYVC54hsr4JoOzWZhTrPp2hor3DkDyo2py59A3rbZ2QMH7sCO3uB2ckRN8Gr07YDC/zY8WAm7PBt2xoAzCdiowYZ+11bjwGtZWDkaZlruHWnM7+FPI0pv4ZEYnDfg9SxU5wvYmoBeDU4bcOxWod289mUD9zWKT6OvAIG73m2dasEk2+39++f5GMe1e1l3D1ZkIR3yGUk6BfFQvm2C7ILyvQt8bZg25jaISBNFfDzSvZuvZmH73XAih0NOQbsO02w4FoMfRsDKLCwZLNjN/IOmlFqctFqO34/17YBuaWcs3baK7QtycF13r0PQjLDf0Wkyc7GOWqrvAHTSMzpnDtZrNotBvYmSed4gU4LbxttOeSxlVZz2GkoOgit6qgloGFKqn0GF2lhnt+wteumWIKCu6Km3FewCzGL/+hr3Dd4w6H4jFfH7JLt1iddQ+jEnsg+lhlWAEjYlnZavQs0FwW7dk9ZSMVF8Uezf2VNomwBt+wPy+enkmSpLt/8G6sIIQnE+abXOUe43WmgEtLSRakOYETLkqmHrM2r5s99rLDk38hO2DEPIgeGKB1DgCHw3jIiPisVDma/RSXbrPuCbMGl1pf0cXoQfUepQuJnq60l2y7dBnrInd8Ye2ADy/RCZf6vLnW0OJ6KUKbmWU0DjENMOZOzsu+WcZQuYTvtA0v5rjQhbKP2xBHBJs3krjNCHodmsAy4FuDIibEnarWun0z5QLj7U3yrXmFXvGPp6RDUIoqE4KhafTab19qMK93KZ1BhlyGZEPa9QDkqOa5b95UTOdTyJ/BERERERERER/1X+BYUavJQ/aiRZAAAAAElFTkSuQmCC
@@ -100,7 +100,7 @@ NS.PLATFORMS=["Steam","Epic"],
 NS.getConfigFor=(key,platform)=>NS.storage.getSync(key+platform,CONFIG_DEFAULTS[key]),
 NS.setConfigFor=(key,platform,value)=>NS.storage.set(key+platform,value),
 NS.getConfig=key=>NS.getConfigFor(key,currentPlatform())
-;const DEFAULT_SECTION_ORDER=["scores","reviewGrading","award","review","steamReviews","esrb","developer","publisher","genres","platforms","features","description","hltb","leisure"]
+;const DEFAULT_SECTION_ORDER=["scores","reviewGrading","award","steamReviews","esrb","developer","publisher","genres","platforms","features","hltb","review","leisure","description"]
 ;NS.SECTION_LABELS={scores:"IGN Score / User Rating",
 reviewGrading:"Review Grading",review:"Review Summary",
 steamReviews:"Steam Reviews",award:"Leaderboard Rank",
@@ -152,7 +152,8 @@ const enabled=NS.getEnabledPlatforms()
 },NS.LOCATION_OPTIONS=[{value:"inline",
 label:"Inline (Default)"},...NS.BADGE_POSITION_OPTIONS]
 ;const DEFAULT_SECTION_LOCATIONS={hltb:"belowGameMedia",
-leisure:"belowGameMedia"}
+review:"belowGameMedia",leisure:"belowGameMedia",
+description:"belowGameMedia"}
 ;NS.getSectionLocationFor=(key,platform)=>NS.storage.getSync(key+"Location"+platform,DEFAULT_SECTION_LOCATIONS[key]||"inline"),
 NS.setSectionLocationFor=(key,platform,value)=>NS.storage.set(key+"Location"+platform,value),
 NS.getCombineAllFor=platform=>NS.storage.getSync("combineAll"+platform,!1),
@@ -741,7 +742,10 @@ e.target.closest&&e.target.closest(".ign_open_settings_gear")&&NS.openSettings()
 })
 }(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
 "use strict"
-;const EDITION_NOISE_RE=/\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|remaster|director's cut|anniversary|special)\s*(edition)?\b/gi,EDITION_QUALIFIER_TEST_RE=new RegExp(EDITION_NOISE_RE.source,"i"),STOPWORDS=new Set(["the","a","an","of","and","edition"]),ROMAN_TABLE=[[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]]
+;const EDITION_NOISE_RE=/\b(the\s+)?(ultimate|deluxe|game of the year|goty|standard|digital deluxe|complete|definitive|enhanced|remastered|remaster|director's cut|anniversary|special)\s*(edition)?\b/gi,EDITION_QUALIFIER_TEST_RE=new RegExp(EDITION_NOISE_RE.source,"i"),
+BUNDLE_WORD_RE=/\b(collection|compilation|trilogy|anthology|bundle)\b/gi,
+bundleWords=str=>String(str).toLowerCase().match(BUNDLE_WORD_RE)||[],
+hasExtraBundleWord=(candidateName,term)=>{const wanted=bundleWords(term);return bundleWords(candidateName).some(w=>!wanted.includes(w))},STOPWORDS=new Set(["the","a","an","of","and","edition"]),ROMAN_TABLE=[[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]]
 ;function toRoman(num){let n=num,result=""
 ;for(const[value,numeral]of ROMAN_TABLE)for(;n>=value;)result+=numeral,
 n-=value;return result}const ROMAN_LOOKUP={}
@@ -799,10 +803,10 @@ candidateSet.has(t)&&overlap++})
 const dates=(obj?.objectRegions??[]).flatMap(r=>r.releases??[]).map(r=>r.date).filter(d=>"string"==typeof d&&/^\d{4}-\d{2}-\d{2}$/.test(d)).sort()
 ;return dates.length?parseInt(dates[0].slice(0,4),10):null
 }(candidateObj)
-;null!=ignYear&&(score+=ignYear===storeYear?.15:-.15)}
+;null!=ignYear&&(ignYear===storeYear?score+=.15:score-=EDITION_QUALIFIER_TEST_RE.test(term)&&ignYear<storeYear?Math.min(.15,.01*(storeYear-ignYear)):.15)}
 return score
 }(targetTokens,significantTokens(name),storeYear,obj)
-;score>=0&&EDITION_QUALIFIER_TEST_RE.test(name)&&(score-=.35),
+;score>=0&&(EDITION_QUALIFIER_TEST_RE.test(name)||hasExtraBundleWord(name,term))&&(score-=.35),
 score>bestScore&&(bestScore=score,best=obj)
 }),!best||bestScore<.5)return callback(null);callback({
 slug:String(best.slug).toLowerCase(),

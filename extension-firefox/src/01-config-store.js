@@ -41,7 +41,7 @@
         publisher: ["showPublisher"], genres: ["showGenres"], platforms: ["showPlatforms"], features: ["showFeatures"],
         description: ["showDescription"], hltb: ["showHltb"], leisure: ["showLeisure"]
     };
-    const DEFAULT_SECTION_ORDER = [ "scores", "reviewGrading", "award", "review", "steamReviews", "esrb", "developer", "publisher", "genres", "platforms", "features", "description", "hltb", "leisure" ];
+    const DEFAULT_SECTION_ORDER = [ "scores", "reviewGrading", "award", "steamReviews", "esrb", "developer", "publisher", "genres", "platforms", "features", "hltb", "review", "leisure", "description" ];
     NS.SECTION_LABELS = SECTION_LABELS;
     NS.SECTION_CONFIG_KEYS = SECTION_CONFIG_KEYS;
     NS.DEFAULT_SECTION_ORDER = DEFAULT_SECTION_ORDER;
@@ -88,9 +88,10 @@
     // Independent placement for HLTB / Leisure: 'inline' (default, inside the main badge) or any of
     // the positions above, rendered as their own element.
     NS.LOCATION_OPTIONS = [{ value: "inline", label: "Inline (Default)" }, ...NS.BADGE_POSITION_OPTIONS];
-    // HLTB/Leisure default to "Below Game Media" rather than inline like everything else, since
-    // their stat-block layout reads better as its own element than folded into the main badge.
-    const DEFAULT_SECTION_LOCATIONS = { hltb: "belowGameMedia", leisure: "belowGameMedia" };
+    // HLTB/Review Summary/Leisure/Description default to "Below Game Media" (i.e. "Separate Entry"
+    // checked) rather than inline like everything else. Because they share one Location they render
+    // combined as one element, in their relative DEFAULT_SECTION_ORDER order above.
+    const DEFAULT_SECTION_LOCATIONS = { hltb: "belowGameMedia", review: "belowGameMedia", leisure: "belowGameMedia", description: "belowGameMedia" };
     NS.getSectionLocationFor = (key, platform) => NS.storage.getSync(key + "Location" + platform, DEFAULT_SECTION_LOCATIONS[key] || "inline");
     NS.setSectionLocationFor = (key, platform, value) => NS.storage.set(key + "Location" + platform, value);
     // "Combine all entries in one place": a per-platform override that, when on, forces EVERY
