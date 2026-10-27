@@ -81,42 +81,80 @@
         while (node && node.parentElement && node.parentElement !== container) node = node.parentElement;
         return node && node.parentElement === container ? node : null;
     }
-    // The shared container itself (unlike commonAncestorChild, which returns a's own row inside it) —
-    // used to anchor on Epic's whole purchase/info panel without depending on it being tagged
-    // <aside> specifically, which isn't guaranteed to be stable across their markup changes.
-    function commonAncestor(a, b) {
-        let common = a.parentElement;
-        while (common && !common.contains(b)) common = common.parentElement;
-        return common;
+    // Epic's product page, as of the current markup (verified against a saved copy of a real page):
+    //   <main> > <header><h1>title</h1>...</header>, tab nav, and a two-column row:
+    //     [main column: media carousel, short description, tag rows, long description ([data-testid="ldesc"])]
+    //     [sidebar wrapper > <section>: logo, ratings, price + buy buttons, metadata rows (with a <time>)]
+    //   then full-width <section>s below (editions, DLC, reviews, "System Requirements", ...).
+    // There is no <aside>, and none of the old data-testids (purchase-cta-button, pdp-title,
+    // metadata-developer-single, about-*) exist any more. Class names are hashed CSS-module names that
+    // change between deploys, so nothing here selects by class: anchors are found through tags
+    // (h1/header/section/time/button), the one stable test id (ldesc), and structure (siblings/parents).
+    // Every field is null when its anchor can't be found, and the caller then warns (see below).
+    function findEpicLayout() {
+        const main = document.querySelector("main") || document.body;
+        const h1 = main.querySelector("h1") || document.querySelector("h1");
+        const header = h1 ? (h1.closest("header") || h1) : null;
+        const ldesc = main.querySelector('[data-testid="ldesc"]');
+        const timeEl = main.querySelector("time[datetime]");
+        let sidebarSection = timeEl ? timeEl.closest("section") : null;
+        let sidebarWrapper = sidebarSection ? sidebarSection.parentElement : null;
+        let mainColumn = sidebarWrapper ? sidebarWrapper.previousElementSibling : null;
+        if (!mainColumn && ldesc) {
+            // Fallback: climb from the long description to the column whose next sibling holds the sidebar.
+            for (let node = ldesc; node && node.parentElement && node.parentElement !== main; node = node.parentElement) {
+                const sib = node.nextElementSibling;
+                if (sib && sib.querySelector("section")) { mainColumn = node; sidebarWrapper = sib; sidebarSection = sib.querySelector("section"); break; }
+            }
+        }
+        // The release-date row's container: climb from <time> to the first ancestor whose parent has
+        // several children (that ancestor is one metadata row; its parent is the list of rows).
+        let metaContainer = null;
+        if (timeEl && sidebarSection && sidebarSection.contains(timeEl)) {
+            let row = timeEl;
+            while (row.parentElement && row.parentElement !== sidebarSection && row.parentElement.children.length < 3) row = row.parentElement;
+            const container = row.parentElement;
+            if (container && container !== sidebarSection && sidebarSection.contains(container)) metaContainer = container;
+        }
+        // The price + buy-button block: the sidebar row that contains the first button in the sidebar.
+        const firstSidebarButton = sidebarSection ? sidebarSection.querySelector("button") : null;
+        return {
+            main, header, sidebarSection, sidebarWrapper, mainColumn, metaContainer,
+            carousel: mainColumn ? mainColumn.firstElementChild : null,
+            descRoot: mainColumn && ldesc ? rowUnder(mainColumn, ldesc) : null,
+            purchasePanel: sidebarSection && firstSidebarButton ? rowUnder(sidebarSection, firstSidebarButton) : null
+        };
     }
-    // `a`'s own ancestor-or-self that's a direct child of the nearest ancestor shared with `b` —
-    // anchors "insert before this whole section" without needing the exact (unstable) nesting depth.
-    function commonAncestorChild(a, b) {
-        let common = a.parentElement;
-        while (common && !common.contains(b)) common = common.parentElement;
-        return common ? rowUnder(common, a) : null;
+    // Epic: anchor immediately after the whole "System Requirements" section (shared by the explicit
+    // "Bottom of Left Sidebar" position and the settings gear on mobile). The heading text is
+    // localized, so when it can't be matched the last full-width <section> outside the sidebar is
+    // used instead (System Requirements is the last one on the page).
+    function findEpicBelowSystemRequirements(layout) {
+        const heading = Array.from(document.querySelectorAll("h2, h3")).find(h => /system requirements/i.test(h.textContent || ""));
+        let section = heading ? heading.closest("section") : null;
+        if (!section && layout.main) {
+            const lowers = Array.from(layout.main.querySelectorAll("section")).filter(sec => !(layout.sidebarSection && layout.sidebarSection.contains(sec)) && !sec.parentElement.closest("section"));
+            section = lowers.length ? lowers[lowers.length - 1] : null;
+        }
+        return section && section.parentElement ? { element: section, position: "after" } : null;
     }
-    // Epic: anchor immediately after the whole "System Requirements" section (shared by the
-    // explicit "Bottom of Left Sidebar" position and, on mobile only, the no-preference fallback -
-    // see getTargetInsertionPoint below). Pulled out so both call sites stay in sync.
-    function findEpicBelowSystemRequirements() {
-        // The whole "System Requirements" section shares this site-wide two-level wrapper (h3
-        // in a title div, both in one outer section div — same as "Follow Us"/"Editions"/"DLC"/
-        // "Ratings"). Inserting after that outer section keeps the badge outside the card's
-        // rounded background instead of squeezed between the OS tabs and the info rows below.
-        const sysReqHeading = Array.from(document.querySelectorAll("h3")).find(h => /system requirements/i.test(h.textContent || ""));
-        const sysReqSection = sysReqHeading && sysReqHeading.parentElement && sysReqHeading.parentElement.parentElement;
-        if (sysReqSection && sysReqSection.parentElement && sysReqSection.parentElement.children.length > 1) return { element: sysReqSection, position: "after" };
-        // Fallback: right after the tabs, before whichever info block comes next in the card.
-        const tabs = document.querySelector('[role="tablist"]');
-        const nextLabel = Array.from(document.querySelectorAll("p")).find(p => /login accounts required|languages supported/i.test(p.textContent || ""));
-        const row = tabs && nextLabel ? commonAncestorChild(tabs, nextLabel) : null;
-        if (row) return { element: row, position: "after" };
-        // Last resort: after the whole info card, aligned to the actual left content column.
-        const main = document.querySelector('main');
-        const fallbackRow = rowUnder(main, Array.from(document.querySelectorAll("p")).find(p => /languages supported/i.test(p.textContent || "")));
-        if (fallbackRow) return { element: fallbackRow, position: "after", alignTo: (document.querySelector("aside") && document.querySelector("aside").previousElementSibling) || fallbackRow };
-        return null;
+    // Epic's markup changes without notice. When a Location's anchor can't be found the code falls back
+    // to the top of <main> (above the game title) no matter what the setting says - so that case is
+    // reported once per Location, with a dump of what the page actually contains, instead of failing
+    // silently.
+    const epicAnchorWarned = {};
+    function warnEpicAnchorMissing(pref, layout) {
+        if (epicAnchorWarned[pref]) return;
+        epicAnchorWarned[pref] = true;
+        const probes = ["main", "main h1", "main header", "time[datetime]", '[data-testid="ldesc"]', "section", "aside", '[role="tablist"]'];
+        const found = {};
+        probes.forEach(sel => { found[sel] = document.querySelectorAll(sel).length; });
+        const resolved = {};
+        Object.keys(layout || {}).forEach(k => { resolved[k] = !!layout[k]; });
+        const testIds = Array.from(new Set(Array.from(document.querySelectorAll("[data-testid]")).map(e => e.getAttribute("data-testid")))).slice(0, 80);
+        const headings = Array.from(document.querySelectorAll("h1, h2, h3")).slice(0, 25)
+            .map(h => h.tagName + ": " + (h.textContent || "").trim().slice(0, 40) + (h.getAttribute("data-testid") ? " [" + h.getAttribute("data-testid") + "]" : ""));
+        console.warn('[IGN Metadata Injector] Epic: no anchor found for Location "' + pref + '" - falling back to the top of the page.', { anchorsFound: found, layoutResolved: resolved, testIds, headings });
     }
     NS.getTargetInsertionPoint = function getTargetInsertionPoint(explicitPosition) {
         const pref = explicitPosition || NS.getBadgePosition();
@@ -151,37 +189,22 @@
             if (packageList) return { element: packageList, position: "before" };
         }
         if (NS.IS_EPIC) {
-            const buyBtn = document.querySelector('[data-testid="purchase-cta-button"]');
-            // Anchoring off the buy button (rather than a bare "aside" selector) finds the actual
-            // sidebar, not an unrelated aside elsewhere on the page (e.g. a recommendations rail).
-            const aside = (buyBtn && buyBtn.closest("aside")) || document.querySelector("aside");
-            if (pref === "aboveTitle") { const titleSpan = document.querySelector('[data-testid="pdp-title"]'); const titleH1 = titleSpan ? titleSpan.closest("h1") : null; if (titleH1) return { element: NS.findSafeBeforeTarget(titleH1), position: "before" }; }
-            // <aside> is sticky-positioned, so content appended inside only becomes visible once it
-            // un-sticks, by when the page has scrolled past it. Escaping to normal flow after the whole
+            const layout = findEpicLayout();
+            if (pref === "aboveTitle" && layout.header) return { element: layout.header, position: "before" };
+            if (pref === "belowGameMedia" && layout.carousel) return { element: layout.carousel, position: "after" };
+            // Epic's "Above Game Description" = between the tag rows and the long description.
+            if (pref === "abovePrice" && layout.descRoot) return { element: layout.descRoot, position: "before" };
+            if (pref === "aboveRightSidebarMetadata" && layout.metaContainer) return { element: layout.metaContainer, position: "before" };
+            if (pref === "belowRightSidebarMetadata" && layout.metaContainer) return { element: layout.metaContainer, position: "after" };
+            // The sidebar column is sticky-positioned, so content appended inside it only becomes visible
+            // once it un-sticks, by when the page has scrolled past. Escaping to normal flow after the whole
             // row avoids that; alignTo re-aligns it visually under the sidebar's column afterward.
-            // Anchored on the common container of the buy button and a stable metadata row (rather
-            // than requiring an actual <aside> tag) - if Epic's markup doesn't wrap this panel in
-            // <aside> at all, buyBtn.closest("aside") finds nothing and the bare document-wide
-            // querySelector("aside") fallback can grab a completely unrelated <aside> elsewhere on
-            // the page (e.g. a left-hand nav), landing the settings gear on the wrong side entirely.
-            const devEl = document.querySelector('[data-testid="metadata-developer-single"]');
-            const sidebarPanel = (buyBtn && devEl && commonAncestor(buyBtn, devEl)) || aside;
-            if ((pref === "sidebarBottom" || pref === "belowRightSidebarMetadata") && sidebarPanel) return { element: NS.findSafeAfterTarget(sidebarPanel), position: "after", alignTo: sidebarPanel };
-            if (pref === "abovePrice") {
-                const metaCols = document.querySelectorAll('[data-testid="about-metadata-layout-column"]');
-                const metaRow = metaCols.length ? metaCols[metaCols.length - 1].parentElement : null;
-                if (metaRow) return { element: metaRow, position: "after" };
-                const about = document.getElementById("about-long-description");
-                if (about) return { element: about, position: "before" };
-            }
-            if (pref === "aboveRightSidebarMetadata") { const row = rowUnder(aside, document.querySelector('[data-testid="metadata-developer-single"]')); if (row) return { element: row, position: "before" }; }
-            if (pref === "belowGameMedia") { const metaCol = document.querySelector('[data-testid="about-metadata-layout-column"]'), aboutDesc = document.getElementById("about-long-description"); const row = metaCol && aboutDesc ? commonAncestorChild(metaCol, aboutDesc) : null; if (row) return { element: row, position: "before" }; }
-            if (pref === "belowLeftSidebar") {
-                const anchor = findEpicBelowSystemRequirements();
-                if (anchor) return anchor;
-            }
-            const epicTarget = aside || document.querySelector('main');
-            if (epicTarget) return { element: epicTarget, position: "prepend" };
+            if (pref === "sidebarBottom" && layout.sidebarWrapper) return { element: NS.findSafeAfterTarget(layout.sidebarWrapper), position: "after", alignTo: layout.sidebarWrapper };
+            if (pref === "belowLeftSidebar") { const anchor = findEpicBelowSystemRequirements(layout); if (anchor) return anchor; }
+            // "Default" = top of the right-hand sidebar column (the old <aside> prepend, on today's markup).
+            if (pref === "default" && layout.sidebarWrapper) return { element: layout.sidebarWrapper, position: "prepend" };
+            warnEpicAnchorMissing(pref, layout);
+            if (layout.main) return { element: layout.main, position: "prepend" };
         }
         return null;
     };

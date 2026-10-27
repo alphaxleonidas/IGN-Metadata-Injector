@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         IGN Metadata Injector
 // @namespace    http://tampermonkey.net/
-// @version      1.0.9
+// @version      1.0.10
 // @description  Displays IGN review scores, user ratings, clickable HLTB with dynamic category data, Developer, and prominent ESRB rating with content descriptors.
 // @author       Leonidas
 // @icon         data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABmJLR0QA/wD/AP+gvaeTAAAE8klEQVRoge2YW2wUZRTHf99ctnS70HKT0uXSRO5LTOQSQwmGEDEx0cgl0YAxmJgIEjUhPCgPwgM++GRMQIIJokEexIR4IZEXgyVYIJEmIK0FaUy5LBTKpS0tu+3OzPFhFnZmd5ZOgSed38vkO+c75/uf+c58M7sQEREREREREfH/RT3phKeYbybpT1oxc6RySACIRp8xmLubpiq9gObck1zvoQWMq5271EaeKw1Stm7Ljze6xnekzesLxNaWKkUDMBuoB4wyKS2gA2gT4bjSncZkbsKpp8Z31du6WiGIXhwgaCe7O88eHXYBNbWz6jX0C+XEjHHobrxFDhhfLkdIupeNRb+pMbKM33KUM637WtvFIGe5OzUkCaHGOz6vw8WQ2aZaMNN+MKyplEdV8ZACznXGug5V2YcvaLzsKP9OxYGXsoXxpwloM+BpK9yi++OQysGHfe54dw/8MgIyRfM0QaY7HH6l37xZWyZXYAvdYtqojF7xK7BwKDFdGrxTDQfvgBbgv6cgXnSHHWDVaNjTA+OcoVYA4I9Ke+CFsbT3FjuC1iSjV+wNIx7cAiY7/kTbE/B5FZwwYfMoyCnw1qABUxy4Ebh6IAvzmkooSXHVmPsisDp06gDSOgwoSIgrfkccPkk8TkYAVue1+SgpwBH54HFXWpuBNRnYFxd0YFO/W1QYjlTA+9XuNYw2XwGXWVQJLC+edFuDk6Z7DUOHAbvjsCqjmJNzH7TZIR/wrQk4GoNtwTu2/Crz416D7xTSjN55IsSKo3bE4WAlrM7Atj6/T1HobwH6Fbxxz22huMCinPsgv9cPfQqqpBATdIKkbDihQSq44JgY2WexaHqg2et1BN9p1aW5wttNd9xuuuMuT9REB/7RYVC54hsr4JoOzWZhTrPp2hor3DkDyo2py59A3rbZ2QMH7sCO3uB2ckRN8Gr07YDC/zY8WAm7PBt2xoAzCdiowYZ+11bjwGtZWDkaZlruHWnM7+FPI0pv4ZEYnDfg9SxU5wvYmoBeDU4bcOxWod289mUD9zWKT6OvAIG73m2dasEk2+39++f5GMe1e1l3D1ZkIR3yGUk6BfFQvm2C7ILyvQt8bZg25jaISBNFfDzSvZuvZmH73XAih0NOQbsO02w4FoMfRsDKLCwZLNjN/IOmlFqctFqO34/17YBuaWcs3baK7QtycF13r0PQjLDf0Wkyc7GOWqrvAHTSMzpnDtZrNotBvYmSed4gU4LbxttOeSxlVZz2GkoOgit6qgloGFKqn0GF2lhnt+wteumWIKCu6Km3FewCzGL/+hr3Dd4w6H4jFfH7JLt1iddQ+jEnsg+lhlWAEjYlnZavQs0FwW7dk9ZSMVF8Uezf2VNomwBt+wPy+enkmSpLt/8G6sIIQnE+abXOUe43WmgEtLSRakOYETLkqmHrM2r5s99rLDk38hO2DEPIgeGKB1DgCHw3jIiPisVDma/RSXbrPuCbMGl1pf0cXoQfUepQuJnq60l2y7dBnrInd8Ye2ADy/RCZf6vLnW0OJ6KUKbmWU0DjENMOZOzsu+WcZQuYTvtA0v5rjQhbKP2xBHBJs3krjNCHodmsAy4FuDIibEnarWun0z5QLj7U3yrXmFXvGPp6RDUIoqE4KhafTab19qMK93KZ1BhlyGZEPa9QDkqOa5b95UTOdTyJ/BERERERERER/1X+BYUavJQ/aiRZAAAAAElFTkSuQmCC
@@ -233,131 +233,217 @@ const match=title.match(/^(.*?)\s*\[[^\]]*collection[^\]]*\]\s*$/i)
 },NS.sigmaLetterFallbackTitle=function(title){
 return/[Σσς]/.test(title)?title.replace(/[Σσς](\d)/g,"S$1").replace(/[Σσς]/g,"S"):null
 }
-}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
-"use strict"
-;const cleanSteamTitle=raw=>raw.replace(/^Save \d+% on /i,"").replace(/^Pre-purchase /i,"").replace(/ on Steam$/i,"").trim()
-;function rowUnder(container,markerEl){
-if(!container||!markerEl)return null;let node=markerEl
-;for(;node&&node.parentElement&&node.parentElement!==container;)node=node.parentElement
-;return node&&node.parentElement===container?node:null}
-function commonAncestorChild(a,b){let common=a.parentElement
-;for(;common&&!common.contains(b);)common=common.parentElement
-;return common?rowUnder(common,a):null}
-NS.getGameTitle=function(){let title=null;if(NS.IS_STEAM){
-const titleEl=document.getElementById("appHubAppName")||document.querySelector(".page_title_area .apphub_AppName")||document.querySelector(".app_header_content .app_name")
-;if(titleEl&&titleEl.textContent.trim()&&(title=titleEl.textContent.trim()),
-!title){
-const ogTitle=document.querySelector('meta[property="og:title"]')
-;if(ogTitle&&ogTitle.content){
-const t=cleanSteamTitle(ogTitle.content.trim());t&&(title=t)
-}}if(!title&&document.title){
-const t=cleanSteamTitle(document.title)
-;t&&"Steam"!==t&&(title=t)}}
-if(!title&&NS.IS_EPIC&&/\/(p|bundles)\/[^/?#]+/i.test(window.location.pathname)){
-const h1El=document.querySelector("h1")||document.querySelector('[data-testid="pdp-title"]')
-;h1El&&(title=h1El.textContent.trim())}
-return title?(title=>title.replace(/[\s:-]*\bdemo\b\s*$/i,"").trim())(title):null
-},NS.extractSteamReviews=function(){if(!NS.IS_STEAM)return[]
-;const SENTIMENT_COLORS={positive:"#66c0f4",mixed:"#e2b93d",
-negative:"#a34c25"},results=[]
-;return document.querySelectorAll("#userReviews .user_reviews_summary_row").forEach(row=>{
-const subtitleEl=row.querySelector(".subtitle"),summaryEl=row.querySelector(".game_review_summary")
-;if(!subtitleEl||!summaryEl)return
-;const label=subtitleEl.textContent.trim().replace(/:\s*$/,""),summaryText=summaryEl.textContent.trim()
-;if(!label||!summaryText)return
-;const countEl=row.querySelector(".responsive_hidden"),count=countEl?countEl.textContent.trim().replace(/[()]/g,""):""
-;let percent=""
-;const percentMatch=(row.getAttribute("data-tooltip-html")||"").match(/(\d+)%/)
-;percentMatch&&(percent=`${percentMatch[1]}%`)
-;let sentiment="mixed"
-;/\bpositive\b/i.test(summaryEl.className)?sentiment="positive":/\bnegative\b/i.test(summaryEl.className)&&(sentiment="negative"),
-results.push({label:label,summaryText:summaryText,
-count:count,percent:percent,
-color:SENTIMENT_COLORS[sentiment]})}),results
-},NS.extractDlcBaseGameName=function(){
-if(!NS.IS_STEAM)return null
-;for(const p of document.querySelectorAll(".content p, p")){
-if(!/requires the base game/i.test(p.textContent||""))continue
-;const link=p.querySelector('a[href*="/app/"]')||p.querySelector("a"),name=link?link.textContent.trim():""
-;if(name)return name}return null
-},NS.extractPackageItemNames=function(){
-if(!NS.IS_STEAM)return[];const names=[],seen=new Set
-;return document.querySelectorAll(".package_landing_page_item_list .tab_item_name").forEach(el=>{
-const name=(el.textContent||"").trim(),key=name.toLowerCase()
-;name&&!seen.has(key)&&(seen.add(key),names.push(name))
-}),names
-},NS.getTargetInsertionPoint=function(explicitPosition){
-const pref=explicitPosition||NS.getBadgePosition()
-;if(NS.IS_STEAM){if("aboveTitle"===pref){
-const titleArea=document.querySelector(".page_title_area.game_title_area")||document.querySelector(".page_title_area")
-;if(titleArea)return{
-element:NS.findSafeBeforeTarget(titleArea),position:"before"
-}}
-if("sidebarBottom"===pref||"belowRightSidebarMetadata"===pref||"aboveRightSidebarMetadata"===pref){
-const sidebar=document.querySelector(".rightcol.game_meta_data")||document.querySelector(".game_meta_data")
-;if(sidebar)return{element:sidebar,
-position:"aboveRightSidebarMetadata"===pref?"prepend":"append"
-}}if("abovePrice"===pref){
-const purchaseArea=document.querySelector("#game_area_purchase")
-;if(purchaseArea)return{element:purchaseArea,
-position:"before"}}if("belowGameMedia"===pref){
-const media=document.querySelector(".highlight_ctn")
-;if(media)return{element:media,position:"after",
-alignTo:media.querySelector(".highlight_overflow")||media}}
-if("belowLeftSidebar"===pref){
-const sysReq=document.querySelector(".sys_req"),sysReqCtn=sysReq&&sysReq.closest(".game_page_autocollapse_ctn")
-;if(sysReqCtn)return{element:sysReqCtn,position:"after"}
-;const leftCol=document.querySelector(".leftcol.game_description_column")
-;if(leftCol)return{element:NS.findSafeAfterTarget(leftCol),
-position:"after",alignTo:leftCol}}
-const headerImage=document.querySelector(".game_header_image_full")||document.querySelector(".game_header_image_ctn")||document.querySelector(".glance_ctn_responsive .game_header_image_full")
-;if(headerImage)return{element:headerImage,position:"before"
-}
-;const glanceCtn=document.querySelector(".glance_ctn_responsive")||document.querySelector(".game_meta_data")
-;if(glanceCtn)return{element:glanceCtn,position:"prepend"}
-;const mobileReviews=document.querySelector("#user_reviews_container")||document.querySelector(".user_reviews_filter_score")||document.querySelector(".review_histogram_rollup")
-;if(mobileReviews)return{element:mobileReviews,
-position:"after"}
-;const packageList=document.querySelector(".package_landing_page_item_list")
-;if(packageList)return{element:packageList,position:"before"
-}}if(NS.IS_EPIC){
-const buyBtn=document.querySelector('[data-testid="purchase-cta-button"]'),aside=buyBtn&&buyBtn.closest("aside")||document.querySelector("aside")
-;if("aboveTitle"===pref){
-const titleSpan=document.querySelector('[data-testid="pdp-title"]'),titleH1=titleSpan?titleSpan.closest("h1"):null
-;if(titleH1)return{element:NS.findSafeBeforeTarget(titleH1),
-position:"before"}}
-const devEl=document.querySelector('[data-testid="metadata-developer-single"]'),sidebarPanel=buyBtn&&devEl&&function(a,b){
-let common=a.parentElement
-;for(;common&&!common.contains(b);)common=common.parentElement
-;return common}(buyBtn,devEl)||aside
-;if(("sidebarBottom"===pref||"belowRightSidebarMetadata"===pref)&&sidebarPanel)return{
-element:NS.findSafeAfterTarget(sidebarPanel),
-position:"after",alignTo:sidebarPanel}
-;if("abovePrice"===pref){
-const metaCols=document.querySelectorAll('[data-testid="about-metadata-layout-column"]'),metaRow=metaCols.length?metaCols[metaCols.length-1].parentElement:null
-;if(metaRow)return{element:metaRow,position:"after"}
-;const about=document.getElementById("about-long-description")
-;if(about)return{element:about,position:"before"}}
-if("aboveRightSidebarMetadata"===pref){
-const row=rowUnder(aside,document.querySelector('[data-testid="metadata-developer-single"]'))
-;if(row)return{element:row,position:"before"}}
-if("belowGameMedia"===pref){
-const metaCol=document.querySelector('[data-testid="about-metadata-layout-column"]'),aboutDesc=document.getElementById("about-long-description"),row=metaCol&&aboutDesc?commonAncestorChild(metaCol,aboutDesc):null
-;if(row)return{element:row,position:"before"}}
-if("belowLeftSidebar"===pref){const anchor=function(){
-const sysReqHeading=Array.from(document.querySelectorAll("h3")).find(h=>/system requirements/i.test(h.textContent||"")),sysReqSection=sysReqHeading&&sysReqHeading.parentElement&&sysReqHeading.parentElement.parentElement
-;if(sysReqSection&&sysReqSection.parentElement&&sysReqSection.parentElement.children.length>1)return{
-element:sysReqSection,position:"after"}
-;const tabs=document.querySelector('[role="tablist"]'),nextLabel=Array.from(document.querySelectorAll("p")).find(p=>/login accounts required|languages supported/i.test(p.textContent||"")),row=tabs&&nextLabel?commonAncestorChild(tabs,nextLabel):null
-;if(row)return{element:row,position:"after"}
-;const fallbackRow=rowUnder(document.querySelector("main"),Array.from(document.querySelectorAll("p")).find(p=>/languages supported/i.test(p.textContent||"")))
-;return fallbackRow?{element:fallbackRow,position:"after",
-alignTo:document.querySelector("aside")&&document.querySelector("aside").previousElementSibling||fallbackRow
-}:null}();if(anchor)return anchor}
-const epicTarget=aside||document.querySelector("main")
-;if(epicTarget)return{element:epicTarget,position:"prepend"}
-}return null}
-}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
+}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),((function (NS) {
+    "use strict";
+    const cleanSteamTitle = raw => raw.replace(/^Save \d+% on /i, "").replace(/^Pre-purchase /i, "").replace(/ on Steam$/i, "").trim();
+    // Demo listings are separate store pages from the full game (e.g. "Ratchet & Clank: Rift Apart
+    // Demo") but should still resolve to the full game's IGN/HLTB data, so "Demo" is stripped from
+    // whatever title gets used for matching/display.
+    const stripDemoSuffix = title => title.replace(/[\s:-]*\bdemo\b\s*$/i, "").trim();
+    // Epic's storefront is a single-domain SPA - the homepage, /browse listing,
+    // /news, /wishlist, /library, /achievements, etc. all share the same
+    // origin as an actual game page and can still contain some <h1> (e.g. a
+    // hero banner or section heading), which would otherwise get misread as a
+    // game title. Real product/DLC pages and bundle pages are the only ones
+    // that live under a /p/<slug> or /bundles/<slug> path (locale prefix
+    // optional, e.g. /en-US/p/hades) - everything else is treated as "not a
+    // game page" regardless of what's in the DOM.
+    function isEpicProductPage() {
+        return /\/(p|bundles)\/[^/?#]+/i.test(window.location.pathname);
+    }
+    NS.getGameTitle = function getGameTitle() {
+        let title = null;
+        if (NS.IS_STEAM) {
+            const titleEl = document.getElementById("appHubAppName") || document.querySelector(".page_title_area .apphub_AppName") || document.querySelector(".app_header_content .app_name");
+            if (titleEl && titleEl.textContent.trim()) title = titleEl.textContent.trim();
+            if (!title) {
+                const ogTitle = document.querySelector('meta[property="og:title"]');
+                if (ogTitle && ogTitle.content) { const t = cleanSteamTitle(ogTitle.content.trim()); if (t) title = t; }
+            }
+            if (!title && document.title) { const t = cleanSteamTitle(document.title); if (t && t !== "Steam") title = t; }
+        }
+        if (!title && NS.IS_EPIC && isEpicProductPage()) {
+            const h1El = document.querySelector("h1") || document.querySelector('[data-testid="pdp-title"]');
+            if (h1El) title = h1El.textContent.trim();
+        }
+        return title ? stripDemoSuffix(title) : null;
+    };
+    NS.extractSteamReviews = function extractSteamReviews() {
+        if (!NS.IS_STEAM) return [];
+        const SENTIMENT_COLORS = { positive: "#66c0f4", mixed: "#e2b93d", negative: "#a34c25" };
+        const results = [];
+        document.querySelectorAll("#userReviews .user_reviews_summary_row").forEach(row => {
+            const subtitleEl = row.querySelector(".subtitle"), summaryEl = row.querySelector(".game_review_summary");
+            if (!subtitleEl || !summaryEl) return;
+            const label = subtitleEl.textContent.trim().replace(/:\s*$/, ""), summaryText = summaryEl.textContent.trim();
+            if (!label || !summaryText) return;
+            const countEl = row.querySelector(".responsive_hidden");
+            const count = countEl ? countEl.textContent.trim().replace(/[()]/g, "") : "";
+            let percent = "";
+            const percentMatch = (row.getAttribute("data-tooltip-html") || "").match(/(\d+)%/);
+            if (percentMatch) percent = `${percentMatch[1]}%`;
+            let sentiment = "mixed";
+            if (/\bpositive\b/i.test(summaryEl.className)) sentiment = "positive";
+            else if (/\bnegative\b/i.test(summaryEl.className)) sentiment = "negative";
+            results.push({ label, summaryText, count, percent, color: SENTIMENT_COLORS[sentiment] });
+        });
+        return results;
+    };
+    NS.extractDlcBaseGameName = function extractDlcBaseGameName() {
+        if (!NS.IS_STEAM) return null;
+        for (const p of document.querySelectorAll(".content p, p")) {
+            if (!/requires the base game/i.test(p.textContent || "")) continue;
+            const link = p.querySelector('a[href*="/app/"]') || p.querySelector("a");
+            const name = link ? link.textContent.trim() : "";
+            if (name) return name;
+        }
+        return null;
+    };
+    NS.extractPackageItemNames = function extractPackageItemNames() {
+        if (!NS.IS_STEAM) return [];
+        const names = [], seen = new Set();
+        document.querySelectorAll(".package_landing_page_item_list .tab_item_name").forEach(el => {
+            const name = (el.textContent || "").trim(), key = name.toLowerCase();
+            if (name && !seen.has(key)) { seen.add(key); names.push(name); }
+        });
+        return names;
+    };
+    // Climbs from a marker element up to the row that's a direct child of `container` — anchors to
+    // real content (a testid, a link) instead of hashed/unstable classes.
+    function rowUnder(container, markerEl) {
+        if (!container || !markerEl) return null;
+        let node = markerEl;
+        while (node && node.parentElement && node.parentElement !== container) node = node.parentElement;
+        return node && node.parentElement === container ? node : null;
+    }
+    // Epic's product page, as of the current markup (verified against a saved copy of a real page):
+    //   <main> > <header><h1>title</h1>...</header>, tab nav, and a two-column row:
+    //     [main column: media carousel, short description, tag rows, long description ([data-testid="ldesc"])]
+    //     [sidebar wrapper > <section>: logo, ratings, price + buy buttons, metadata rows (with a <time>)]
+    //   then full-width <section>s below (editions, DLC, reviews, "System Requirements", ...).
+    // There is no <aside>, and none of the old data-testids (purchase-cta-button, pdp-title,
+    // metadata-developer-single, about-*) exist any more. Class names are hashed CSS-module names that
+    // change between deploys, so nothing here selects by class: anchors are found through tags
+    // (h1/header/section/time/button), the one stable test id (ldesc), and structure (siblings/parents).
+    // Every field is null when its anchor can't be found, and the caller then warns (see below).
+    function findEpicLayout() {
+        const main = document.querySelector("main") || document.body;
+        const h1 = main.querySelector("h1") || document.querySelector("h1");
+        const header = h1 ? (h1.closest("header") || h1) : null;
+        const ldesc = main.querySelector('[data-testid="ldesc"]');
+        const timeEl = main.querySelector("time[datetime]");
+        let sidebarSection = timeEl ? timeEl.closest("section") : null;
+        let sidebarWrapper = sidebarSection ? sidebarSection.parentElement : null;
+        let mainColumn = sidebarWrapper ? sidebarWrapper.previousElementSibling : null;
+        if (!mainColumn && ldesc) {
+            // Fallback: climb from the long description to the column whose next sibling holds the sidebar.
+            for (let node = ldesc; node && node.parentElement && node.parentElement !== main; node = node.parentElement) {
+                const sib = node.nextElementSibling;
+                if (sib && sib.querySelector("section")) { mainColumn = node; sidebarWrapper = sib; sidebarSection = sib.querySelector("section"); break; }
+            }
+        }
+        // The release-date row's container: climb from <time> to the first ancestor whose parent has
+        // several children (that ancestor is one metadata row; its parent is the list of rows).
+        let metaContainer = null;
+        if (timeEl && sidebarSection && sidebarSection.contains(timeEl)) {
+            let row = timeEl;
+            while (row.parentElement && row.parentElement !== sidebarSection && row.parentElement.children.length < 3) row = row.parentElement;
+            const container = row.parentElement;
+            if (container && container !== sidebarSection && sidebarSection.contains(container)) metaContainer = container;
+        }
+        // The price + buy-button block: the sidebar row that contains the first button in the sidebar.
+        const firstSidebarButton = sidebarSection ? sidebarSection.querySelector("button") : null;
+        return {
+            main, header, sidebarSection, sidebarWrapper, mainColumn, metaContainer,
+            carousel: mainColumn ? mainColumn.firstElementChild : null,
+            descRoot: mainColumn && ldesc ? rowUnder(mainColumn, ldesc) : null,
+            purchasePanel: sidebarSection && firstSidebarButton ? rowUnder(sidebarSection, firstSidebarButton) : null
+        };
+    }
+    // Epic: anchor immediately after the whole "System Requirements" section (shared by the explicit
+    // "Bottom of Left Sidebar" position and the settings gear on mobile). The heading text is
+    // localized, so when it can't be matched the last full-width <section> outside the sidebar is
+    // used instead (System Requirements is the last one on the page).
+    function findEpicBelowSystemRequirements(layout) {
+        const heading = Array.from(document.querySelectorAll("h2, h3")).find(h => /system requirements/i.test(h.textContent || ""));
+        let section = heading ? heading.closest("section") : null;
+        if (!section && layout.main) {
+            const lowers = Array.from(layout.main.querySelectorAll("section")).filter(sec => !(layout.sidebarSection && layout.sidebarSection.contains(sec)) && !sec.parentElement.closest("section"));
+            section = lowers.length ? lowers[lowers.length - 1] : null;
+        }
+        return section && section.parentElement ? { element: section, position: "after" } : null;
+    }
+    // Epic's markup changes without notice. When a Location's anchor can't be found the code falls back
+    // to the top of <main> (above the game title) no matter what the setting says - so that case is
+    // reported once per Location, with a dump of what the page actually contains, instead of failing
+    // silently.
+    const epicAnchorWarned = {};
+    function warnEpicAnchorMissing(pref, layout) {
+        if (epicAnchorWarned[pref]) return;
+        epicAnchorWarned[pref] = true;
+        const probes = ["main", "main h1", "main header", "time[datetime]", '[data-testid="ldesc"]', "section", "aside", '[role="tablist"]'];
+        const found = {};
+        probes.forEach(sel => { found[sel] = document.querySelectorAll(sel).length; });
+        const resolved = {};
+        Object.keys(layout || {}).forEach(k => { resolved[k] = !!layout[k]; });
+        const testIds = Array.from(new Set(Array.from(document.querySelectorAll("[data-testid]")).map(e => e.getAttribute("data-testid")))).slice(0, 80);
+        const headings = Array.from(document.querySelectorAll("h1, h2, h3")).slice(0, 25)
+            .map(h => h.tagName + ": " + (h.textContent || "").trim().slice(0, 40) + (h.getAttribute("data-testid") ? " [" + h.getAttribute("data-testid") + "]" : ""));
+        console.warn('[IGN Metadata Injector] Epic: no anchor found for Location "' + pref + '" - falling back to the top of the page.', { anchorsFound: found, layoutResolved: resolved, testIds, headings });
+    }
+    NS.getTargetInsertionPoint = function getTargetInsertionPoint(explicitPosition) {
+        const pref = explicitPosition || NS.getBadgePosition();
+        if (NS.IS_STEAM) {
+            if (pref === "aboveTitle") { const titleArea = document.querySelector(".page_title_area.game_title_area") || document.querySelector(".page_title_area"); if (titleArea) return { element: NS.findSafeBeforeTarget(titleArea), position: "before" }; }
+            if (pref === "sidebarBottom" || pref === "belowRightSidebarMetadata" || pref === "aboveRightSidebarMetadata") { const sidebar = document.querySelector(".rightcol.game_meta_data") || document.querySelector(".game_meta_data"); if (sidebar) return { element: sidebar, position: pref === "aboveRightSidebarMetadata" ? "prepend" : "append" }; }
+            if (pref === "abovePrice") { const purchaseArea = document.querySelector("#game_area_purchase"); if (purchaseArea) return { element: purchaseArea, position: "before" }; }
+            if (pref === "belowGameMedia") {
+                const media = document.querySelector(".highlight_ctn");
+                // Align width/position to .highlight_overflow (the actual clipped carousel bounds)
+                // rather than .highlight_ctn itself — the outer wrapper's own measured rect runs
+                // wider than the visible media, which was stretching the badge too far right.
+                if (media) return { element: media, position: "after", alignTo: media.querySelector(".highlight_overflow") || media };
+            }
+            if (pref === "belowLeftSidebar") {
+                // Anchored on "System Requirements" (.sys_req + its fade/read-more overlay share one
+                // .game_page_autocollapse_ctn wrapper) — stays inside .leftcol's normal flow, so no
+                // findSafeAfterTarget/alignTo needed here (unlike escaping the leftcol/rightcol row).
+                const sysReq = document.querySelector(".sys_req");
+                const sysReqCtn = sysReq && sysReq.closest(".game_page_autocollapse_ctn");
+                if (sysReqCtn) return { element: sysReqCtn, position: "after" };
+                const leftCol = document.querySelector(".leftcol.game_description_column");
+                if (leftCol) return { element: NS.findSafeAfterTarget(leftCol), position: "after", alignTo: leftCol };
+            }
+            const headerImage = document.querySelector(".game_header_image_full") || document.querySelector(".game_header_image_ctn") || document.querySelector(".glance_ctn_responsive .game_header_image_full");
+            if (headerImage) return { element: headerImage, position: "before" };
+            const glanceCtn = document.querySelector(".glance_ctn_responsive") || document.querySelector(".game_meta_data");
+            if (glanceCtn) return { element: glanceCtn, position: "prepend" };
+            const mobileReviews = document.querySelector("#user_reviews_container") || document.querySelector(".user_reviews_filter_score") || document.querySelector(".review_histogram_rollup");
+            if (mobileReviews) return { element: mobileReviews, position: "after" };
+            const packageList = document.querySelector(".package_landing_page_item_list");
+            if (packageList) return { element: packageList, position: "before" };
+        }
+        if (NS.IS_EPIC) {
+            const layout = findEpicLayout();
+            if (pref === "aboveTitle" && layout.header) return { element: layout.header, position: "before" };
+            if (pref === "belowGameMedia" && layout.carousel) return { element: layout.carousel, position: "after" };
+            // Epic's "Above Game Description" = between the tag rows and the long description.
+            if (pref === "abovePrice" && layout.descRoot) return { element: layout.descRoot, position: "before" };
+            if (pref === "aboveRightSidebarMetadata" && layout.metaContainer) return { element: layout.metaContainer, position: "before" };
+            if (pref === "belowRightSidebarMetadata" && layout.metaContainer) return { element: layout.metaContainer, position: "after" };
+            // The sidebar column is sticky-positioned, so content appended inside it only becomes visible
+            // once it un-sticks, by when the page has scrolled past. Escaping to normal flow after the whole
+            // row avoids that; alignTo re-aligns it visually under the sidebar's column afterward.
+            if (pref === "sidebarBottom" && layout.sidebarWrapper) return { element: NS.findSafeAfterTarget(layout.sidebarWrapper), position: "after", alignTo: layout.sidebarWrapper };
+            if (pref === "belowLeftSidebar") { const anchor = findEpicBelowSystemRequirements(layout); if (anchor) return anchor; }
+            // "Default" = top of the right-hand sidebar column (the old <aside> prepend, on today's markup).
+            if (pref === "default" && layout.sidebarWrapper) return { element: layout.sidebarWrapper, position: "prepend" };
+            warnEpicAnchorMissing(pref, layout);
+            if (layout.main) return { element: layout.main, position: "prepend" };
+        }
+        return null;
+    };
+})(window.IGN_METADATA_INJECTOR = window.IGN_METADATA_INJECTOR || {})),function(NS){
 "use strict"
 ;const BADGE_STYLE='margin: 10px auto; padding: 14px 16px; background: linear-gradient(135deg, rgba(20,20,20,0.95), rgba(35,35,35,0.95)); border-radius: 8px; border-left: 5px solid #ff3e3e; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; clear: both; color: #ffffff; grid-column: 1 / -1;',statBlock=(value,label,valueSize="18px",valueColor="#ffffff",labelSize="8px")=>`<div style="display:flex;flex-direction:column;align-items:center;flex:1;text-align:center;"><span style="font-size:${valueSize};font-weight:bold;color:${valueColor};line-height:1.1;">${NS.escapeHtml(value)}</span><span style="font-size:${labelSize};color:#a1b0bd;text-transform:uppercase;font-weight:bold;margin-top:3px;white-space:nowrap;">${NS.escapeHtml(label)}</span></div>`,divider=(height="32px")=>`<div style="border-left:1px solid rgba(255,255,255,0.15);height:${height};"></div>`,sectionRow=(extra="")=>`border-top:1px solid rgba(255,255,255,0.15);padding-top:10px;${extra}`,gearButtonHtml=(extraStyle="")=>`<button type="button" class="ign_open_settings_gear" title="IGN Metadata Injector settings" style="background:transparent;border:none;color:#8f98a0;cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;flex-shrink:0;${extraStyle}">⚙</button>`
 ;function buildTopRow(ignScore,userScore,ignUrl,displayName){
@@ -926,49 +1012,128 @@ const p=result.parsed;return{
 name:p&&p.fetchedGameTitle||fallbackName,url:result.url,
 ignScore:p?p.ignScore:"N/A",userScore:p?p.userScore:"N/A",
 parsed:p}}
-}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),function(NS){
-"use strict";function parseHltbTableColumn(doc,columnName){
-const table=doc.querySelector('table[class*="GameTimeTable"]')
-;if(!table)return[]
-;const colIndex=Array.from(table.querySelectorAll("thead td, thead th")).map(td=>td.textContent.trim().toLowerCase()).indexOf(columnName.toLowerCase())
-;if(-1===colIndex)return[];const results=[]
-;return table.querySelectorAll("tbody tr").forEach(row=>{
-const cells=row.querySelectorAll("td")
-;if(cells.length<=colIndex)return
-;const label=cells[0].textContent.trim()
-;if(!label||/all\s*playstyles/i.test(label))return
-;const time=cells[colIndex].textContent.trim()
-;time&&results.push({label:label,time:time})}),results}
-NS.IGN_SOURCE_OVERRIDES={
-"final fantasy vii remake intergrade":"https://www.ign.com/games/final-fantasy-vii-remake"
-},NS.HLTB_DIRECT_URL_OVERRIDES={
-"ninja gaiden 3: razor's edge":"https://howlongtobeat.com/game/6623",
-"ninja gaiden 3: razor's edge [ninja gaiden: master collection]":"https://howlongtobeat.com/game/6623",
-"kingdom hearts -hd 1.5+2.5 remix-":"https://howlongtobeat.com/game/42802",
-"schrodinger's cat burglar":"https://howlongtobeat.com/game/184497",
-"gothic 1 remake":"https://howlongtobeat.com/game/92900",
-"the relic: first guardian":"https://howlongtobeat.com/game/151982"
-},NS.fetchHltbOverride=function(url,callback){
-const empty=()=>callback({hltbData:[],hltbUrl:""})
-;NS.http.get(url,{onload:function(response){
-if(200!==response.status)return empty();try{
-const p=NS.parseIgnPage((new DOMParser).parseFromString(response.responseText,"text/html"))
-;callback({hltbData:p.hltbData,hltbUrl:p.hltbUrl})}catch(e){
-empty()}},onerror:empty})
-},NS.fetchHltbDirect=function(url,callback){
-const empty=()=>callback({hltbData:[],hltbUrl:url})
-;NS.http.get(url,{onload:function(response){
-if(200!==response.status)return empty();try{
-const doc=(new DOMParser).parseFromString(response.responseText,"text/html")
-;callback({hltbData:parseHltbTableColumn(doc,"average"),
-hltbUrl:url})}catch(e){empty()}},onerror:empty})
-},NS.fetchHltbLeisure=function(hltbUrl,callback){
-if(!hltbUrl||!/howlongtobeat\.com/i.test(hltbUrl))return callback([])
-;NS.http.get(hltbUrl,{onload:function(response){
-if(200!==response.status)return callback([]);try{
-callback(parseHltbTableColumn((new DOMParser).parseFromString(response.responseText,"text/html"),"leisure"))
-}catch(e){callback([])}},onerror:()=>callback([])})}
-}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),
+}(window.IGN_METADATA_INJECTOR=window.IGN_METADATA_INJECTOR||{}),((function (NS) {
+    "use strict";
+    NS.IGN_SOURCE_OVERRIDES = { "final fantasy vii remake intergrade": "https://www.ign.com/games/final-fantasy-vii-remake" };
+    NS.HLTB_DIRECT_URL_OVERRIDES = {
+        "ninja gaiden 3: razor's edge": "https://howlongtobeat.com/game/6623",
+        "ninja gaiden 3: razor's edge [ninja gaiden: master collection]": "https://howlongtobeat.com/game/6623",
+        "kingdom hearts -hd 1.5+2.5 remix-": "https://howlongtobeat.com/game/42802",
+        "schrodinger's cat burglar": "https://howlongtobeat.com/game/184497",
+        "gothic 1 remake": "https://howlongtobeat.com/game/92900",
+        "the relic: first guardian": "https://howlongtobeat.com/game/151982"
+    };
+    NS.fetchHltbOverride = function fetchHltbOverride(url, callback) {
+        const empty = () => callback({ hltbData: [], hltbUrl: "" });
+        NS.http.get(url, {
+            onload: function (response) {
+                if (response.status !== 200) return empty();
+                try {
+                    const p = NS.parseIgnPage(new DOMParser().parseFromString(response.responseText, "text/html"));
+                    callback({ hltbData: p.hltbData, hltbUrl: p.hltbUrl });
+                } catch (e) { empty(); }
+            },
+            onerror: empty
+        });
+    };
+    // HLTB's table class names are CSS-module hashes (currently "M5Fuva_game_main_table", previously
+    // "GameTimeTable_game_main_table__...") that change between deploys, so the table is found by what
+    // it CONTAINS - a header cell with the wanted column name - never by class. The platform table on
+    // the same page has no Average/Leisure header, so it is skipped automatically; with several
+    // single/co-op/versus tables the first one that has the column wins, as before.
+    function parseHltbTableColumn(doc, columnName) {
+        const want = columnName.toLowerCase();
+        for (const table of doc.querySelectorAll("table")) {
+            const headerCells = Array.from(table.querySelectorAll("thead td, thead th")).map(td => td.textContent.trim().toLowerCase());
+            const colIndex = headerCells.indexOf(want);
+            if (colIndex === -1) continue;
+            const results = [];
+            table.querySelectorAll("tbody tr").forEach(row => {
+                const cells = row.querySelectorAll("td");
+                if (cells.length <= colIndex) return;
+                const label = cells[0].textContent.trim();
+                if (!label || /all\s*playstyles/i.test(label)) return;
+                const time = cells[colIndex].textContent.trim();
+                if (time) results.push({ label, time });
+            });
+            if (results.length) return results;
+        }
+        return [];
+    }
+    // Fallback when the visible table can't be parsed at all: the same numbers are in the page's
+    // Next.js data (#__NEXT_DATA__ -> props.pageProps.game.data.game[0]) in seconds. Checked against
+    // a real HLTB page: Average=comp_*_avg, Median=comp_*_med, Rushed=comp_*_l, Leisure=comp_*_h, and
+    // HLTB shows whole minutes (floor), e.g. comp_main_h 29132s -> "8h 5m", comp_plus_h 39741s -> "11h 2m".
+    const HLTB_JSON_SUFFIX = { average: "avg", median: "med", rushed: "l", leisure: "h" };
+    function formatHltbSeconds(sec) {
+        const totalMin = Math.floor(sec / 60), h = Math.floor(totalMin / 60), m = totalMin % 60;
+        return h ? (m ? h + "h " + m + "m" : h + "h") : m + "m";
+    }
+    function parseHltbNextData(doc, columnName) {
+        const suffix = HLTB_JSON_SUFFIX[columnName.toLowerCase()], script = doc.getElementById("__NEXT_DATA__");
+        if (!suffix || !script) return [];
+        let game;
+        try { game = JSON.parse(script.textContent).props.pageProps.game.data.game[0]; } catch (e) { return []; }
+        if (!game) return [];
+        return [["Main Story", "comp_main"], ["Main + Sides", "comp_plus"], ["Completionist", "comp_100"]]
+            .map(([label, key]) => ({ label, seconds: Number(game[key + "_" + suffix]) }))
+            .filter(r => r.seconds > 0)
+            .map(r => ({ label: r.label, time: formatHltbSeconds(r.seconds) }));
+    }
+    function parseHltbColumn(doc, columnName) {
+        const rows = parseHltbTableColumn(doc, columnName);
+        return rows.length ? rows : parseHltbNextData(doc, columnName);
+    }
+    NS.fetchHltbDirect = function fetchHltbDirect(url, callback) {
+        const empty = () => callback({ hltbData: [], hltbUrl: url });
+        NS.http.get(url, {
+            onload: function (response) {
+                if (response.status !== 200) return empty();
+                try {
+                    const doc = new DOMParser().parseFromString(response.responseText, "text/html");
+                    callback({ hltbData: parseHltbColumn(doc, "average"), hltbUrl: url });
+                } catch (e) { empty(); }
+            },
+            onerror: empty
+        });
+    };
+    // Leisure Time is the only HLTB value scraped from HowLongToBeat's own game page (everything else
+    // comes from IGN's page), so when HLTB changes its markup or blocks the request it used to fail
+    // completely silently - every path just returned []. Each failure mode now says which one it was
+    // in the console (prefixed so it's easy to filter), including a short description of what the
+    // response actually contained, so a markup change can be fixed against the real page.
+    const LEISURE_LOG = "[IGN Metadata Injector] HLTB Leisure Time:";
+    function describeHltbDoc(doc, responseText) {
+        return {
+            responseLength: (responseText || "").length,
+            pageTitle: (doc.title || "").slice(0, 80),
+            hasNextData: !!doc.getElementById("__NEXT_DATA__"),
+            tables: Array.from(doc.querySelectorAll("table")).slice(0, 6).map(t => ({
+                className: String(t.className).slice(0, 80),
+                headers: Array.from(t.querySelectorAll("thead td, thead th")).map(c => c.textContent.trim()),
+                bodyRows: t.querySelectorAll("tbody tr").length
+            }))
+        };
+    }
+    NS.fetchHltbLeisure = function fetchHltbLeisure(hltbUrl, callback) {
+        if (!hltbUrl || !/howlongtobeat\.com/i.test(hltbUrl)) return callback([]);
+        const watchdog = setTimeout(() => console.warn(LEISURE_LOG, "no response after 20s from", hltbUrl), 20000);
+        NS.http.get(hltbUrl, {
+            onload: function (response) {
+                clearTimeout(watchdog);
+                if (response.status !== 200) { console.warn(LEISURE_LOG, "HTTP " + response.status + " from", hltbUrl, "(HowLongToBeat refused or redirected the request)"); return callback([]); }
+                let rows = [];
+                try {
+                    const doc = new DOMParser().parseFromString(response.responseText, "text/html");
+                    rows = parseHltbColumn(doc, "leisure");
+                    if (!rows.length) console.warn(LEISURE_LOG, "page fetched OK but no \"Leisure\" column could be parsed from", hltbUrl, describeHltbDoc(doc, response.responseText));
+                } catch (e) { console.warn(LEISURE_LOG, "error while parsing", hltbUrl, e); rows = []; }
+                callback(rows);
+            },
+            onerror: err => { clearTimeout(watchdog); console.warn(LEISURE_LOG, "request failed for", hltbUrl, "(blocked by Tampermonkey @connect permission, network error, or HowLongToBeat bot protection?)", err); callback([]); }
+        });
+    };
+})(window.IGN_METADATA_INJECTOR = window.IGN_METADATA_INJECTOR || {})),
 function(NS){"use strict"
 ;function attachLeisureSection(resolvedHltbUrl){
 const leisureLoc=NS.getSectionLocation("leisure")
