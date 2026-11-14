@@ -39,15 +39,18 @@ Injects IGN data into Steam and Epic's game page. Works on PC and Mobile (Firefo
 
 # Installation:
 
- ## One Click Userscript: [Install](https://github.com/alphaxleonidas/IGN-Metadata-Injector/raw/refs/heads/main/userscript/ign-metadata-injector.user.js)
+ ## One-Click Userscript: [Install](https://github.com/alphaxleonidas/IGN-Metadata-Injector/raw/refs/heads/main/userscript/ign-metadata-injector.user.js)  [RECOMMENDED]
 
  
    **Requirements:** Tampermonkey or some userscript manager
 
  - Supports auto-updates
  - Also works on mobile
+ - Also works on Steam desktop app
 
-# Chrome/Chromium 
+# Local Installation:
+
+## Chrome/Chromium 
 
 - Download the `chromium` version from the [Releases](https://github.com/alphaxleonidas/IGN-Metadata-Injector/releases) section
 - Extract it.
@@ -59,7 +62,7 @@ Injects IGN data into Steam and Epic's game page. Works on PC and Mobile (Firefo
 
 Note: Make sure you select the root folder of the extracted file. 
 
-# Steam [Desktop App]
+## Steam [Desktop App]
 *Ironically, this extension can also be installed on steam, which uses chromium browser underneath. The process is almost identical except for a couple of workarounds*.
 
 So, the idea is to make Steam app open the main chromium browser from which we can load our extension.
@@ -72,7 +75,7 @@ So, the idea is to make Steam app open the main chromium browser from which we c
 - A popup will appear asking you to save. Choose any location, it does not matter in our case.
 - Now the extension will be installed and a new Chromium window will appear. This is where we can follow steps from [#Chrome/Chromium](https://github.com/alphaxleonidas/IGN-Metadata-Injector#chromechromium)
 
-# Firefox 
+## Firefox 
 - Download the `firefox` version from the [Releases](https://github.com/alphaxleonidas/IGN-Metadata-Injector/releases) section
 - Open `about:config`
 - Set `xpinstall.signatures.required` to `false`
@@ -83,7 +86,7 @@ So, the idea is to make Steam app open the main chromium browser from which we c
 
 Note: If the firefox does not recognize the .zip file type, you can rename the .zip to .xpi and it should work fine. .xpi is bacially a zip file with a changed file extension name.
 
-# Firefox (Android)
+## Firefox (Android)
 - Download the `firefox` version from the [Releases](https://github.com/alphaxleonidas/IGN-Metadata-Injector/releases) section
 - Open `about:config`
 - Set `xpinstall.signatures.required` to `false`
@@ -104,4 +107,4 @@ Note: If the firefox does not recognize the .zip file type, you can rename the .
   ```
   node build.js
   ```
-- It will create a file in `PROJECTROOTFOLDER/userscript` named as `ign-metadata-injector.user.js`.
+- It will create a file in `PROJECTFOLDER/userscript` named as `ign-metadata-injector.user.js`.
